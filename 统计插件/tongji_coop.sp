@@ -68,7 +68,7 @@ public Plugin myinfo =
     author = "Seiunsky Maomao",
     description = "统计玩家对于特感的各种数据.",
     version = "2.2",
-    url = "https://steamcommunity.com/id/Nanaka_Fathry_Reisen_U_Inaba/"
+    url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
 public void OnPluginStart()
