@@ -67,7 +67,7 @@ public Plugin myinfo =
     name = "星云猫猫统计",
     author = "Seiunsky Maomao",
     description = "统计玩家对于特感的各种数据.",
-    version = "2.2",
+    version = "2.3",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -262,61 +262,65 @@ public Action PlayerDeath_Event(Event event, const char[] name, bool dontBroadca
 
     int zClass = GetEntProp(victim, Prop_Send, "m_zombieClass");
 
-    // 先统计所有6只特感的击杀量
-    if (!g_bSIDeathRegistered[victim])
+    // 只统计枪械武器
+    if (IsFirearm(GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon")))
     {
-        g_bSIDeathRegistered[victim] = true;
-        g_iKilledSI[attacker]++;
-        //PrintToChatAll("[DEBUG] %N 击杀了特感 [%N]!", attacker, victim);
-    }
-
-    // 在进行Hunter的空爆统计
-    if (zClass == ZC_HUNTER)
-    {
-        int damagetype = event.GetInt("type");
-        int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
-
-        if (weapon == -1) return Plugin_Continue;
-
-        // 获取武器类名
-        char weaponClass[64];
-        GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
-
-        // 获取武器类型
-        int weaponType = L4D2_GetIntWeaponAttribute(weaponClass, L4D2IWA_WeaponType);
-
-        // 判断是否为喷子、近战、机枪
-        bool isShotgun = (weaponType == view_as<int>(WEAPONTYPE_SHOTGUN));
-        bool isMelee = (weaponType == view_as<int>(WEAPONTYPE_MELEE));
-        bool isSMG = (weaponType == view_as<int>(WEAPONTYPE_SMG));
-
-        // 判断是否是飞扑2状态的hunter
-        if (bIsPouncing[victim])
+        // 先统计所有6只特感的击杀量
+        if (!g_bSIDeathRegistered[victim])
         {
-            if (damagetype & DMG_BUCKSHOT || damagetype & DMG_BULLET || damagetype & DMG_SLASH || damagetype & DMG_CLUB)
-            {
-                if (isShotgun)
-                {
-                    // 喷子空爆
-                    g_iShotgunMidairHunters[attacker]++;
-                    //PrintToChatAll("[DEBUG] %N 使用霰弹枪空爆了 Hunter!", attacker);
-                }
-                else if (isMelee)
-                {
-                    // 近战空爆
-                    g_iMeleeMidairHunters[attacker]++;
-                    //PrintToChatAll("[DEBUG] %N 使用近战武器空爆了 Hunter!", attacker);
-                }
-                else if (isSMG)
-                {
-                    // 机枪空爆
-                    g_iSMGUnder10Kills[attacker]++;
-                    //PrintToChatAll("[DEBUG] %N 使用微冲空爆了 Hunter!", attacker);
-                }
-            }
+            g_bSIDeathRegistered[victim] = true;
+            g_iKilledSI[attacker]++;
+            //PrintToChatAll("[DEBUG] %N 击杀了特感 [%N]!", attacker, victim);
+        }
 
-            // 重置 Hunter 的跳跃状态
-            bIsPouncing[victim] = false;
+        // 在进行Hunter的空爆统计
+        if (zClass == ZC_HUNTER)
+        {
+            int damagetype = event.GetInt("type");
+            int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+
+            if (weapon == -1) return Plugin_Continue;
+
+            // 获取武器类名
+            char weaponClass[64];
+            GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
+
+            // 获取武器类型
+            int weaponType = L4D2_GetIntWeaponAttribute(weaponClass, L4D2IWA_WeaponType);
+
+            // 判断是否为喷子、近战、机枪
+            bool isShotgun = (weaponType == view_as<int>(WEAPONTYPE_SHOTGUN));
+            bool isMelee = (weaponType == view_as<int>(WEAPONTYPE_MELEE));
+            bool isSMG = (weaponType == view_as<int>(WEAPONTYPE_SMG));
+
+            // 判断是否是飞扑2状态的hunter
+            if (bIsPouncing[victim])
+            {
+                if (damagetype & DMG_BUCKSHOT || damagetype & DMG_BULLET || damagetype & DMG_SLASH || damagetype & DMG_CLUB)
+                {
+                    if (isShotgun)
+                    {
+                        // 喷子空爆
+                        g_iShotgunMidairHunters[attacker]++;
+                        //PrintToChatAll("[DEBUG] %N 使用霰弹枪空爆了 Hunter!", attacker);
+                    }
+                    else if (isMelee)
+                    {
+                        // 近战空爆
+                        g_iMeleeMidairHunters[attacker]++;
+                        //PrintToChatAll("[DEBUG] %N 使用近战武器空爆了 Hunter!", attacker);
+                    }
+                    else if (isSMG)
+                    {
+                        // 机枪空爆
+                        g_iSMGUnder10Kills[attacker]++;
+                        //PrintToChatAll("[DEBUG] %N 使用微冲空爆了 Hunter!", attacker);
+                    }
+                }
+
+                // 重置 Hunter 的跳跃状态
+                bIsPouncing[victim] = false;
+            }
         }
     }
 
@@ -354,19 +358,23 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 {
     if (IsValidHumanSurvivor(attacker))
     {
-        // 直接处理伤害事件来记录
-        if (IsShotgun(weapon))      //霰弹枪特殊处理
+        // 只统计枪械武器的命中次数
+        if (IsFirearm(weapon))
         {
-            if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                !g_bShotgunHitRegistered[attacker])
+            // 直接处理伤害事件来记录
+            if (IsShotgun(weapon))      //霰弹枪特殊处理
+            {
+                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
+                    !g_bShotgunHitRegistered[attacker])
+                {
+                    g_iEffectiveHits[attacker]++;
+                    g_bShotgunHitRegistered[attacker] = true;
+                }
+            }
+            else
             {
                 g_iEffectiveHits[attacker]++;
-                g_bShotgunHitRegistered[attacker] = true;
             }
-        }
-        else
-        {
-            g_iEffectiveHits[attacker]++;
         }
     }
 
@@ -389,63 +397,67 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
 {
     if (IsValidHumanSurvivor(attacker))
     {
-        // 获取武器类名
-        char weaponClass[64];
-        GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
-
-        // 使用 L4D2_GetIntWeaponAttribute 获取武器类型
-        int weaponType = L4D2_GetIntWeaponAttribute(weaponClass, L4D2IWA_WeaponType);
-
-        // 判断是否为近战武器
-        bool isMelee = (weaponType == view_as<int>(WEAPONTYPE_MELEE));
-
-        // 判断是否为枪械类武器
-        bool isFirearm = (weaponType == view_as<int>(WEAPONTYPE_PISTOL) ||
-                         weaponType == view_as<int>(WEAPONTYPE_SMG) ||
-                         weaponType == view_as<int>(WEAPONTYPE_RIFLE) ||
-                         weaponType == view_as<int>(WEAPONTYPE_SHOTGUN) ||
-                         weaponType == view_as<int>(WEAPONTYPE_SNIPERRIFLE) ||
-                         weaponType == view_as<int>(WEAPONTYPE_MACHINEGUN));
-
-        // 只统计子弹类伤害或近战伤害
-        if (!(damagetype & DMG_BULLET) && !(damagetype & DMG_BUCKSHOT) && !isMelee) return Plugin_Continue;
-
-        // 获取特感的当前血量（转换为浮点数）
-        float health = float(GetEntProp(victim, Prop_Data, "m_iHealth"));
-
-        // 计算实际造成的伤害，防止计算溢出
-        float actualDamage = damage;
-        if (actualDamage > health)
+        // 只统计枪械武器的命中次数
+        if (IsFirearm(weapon))
         {
-            actualDamage = health; // 如果伤害超过当前血量，只记录剩余血量
-        }
+            // 获取武器类名
+            char weaponClass[64];
+            GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
 
-        // 统计对特感造成的伤害(g_iDamageSI)
-        g_iDamageSI[attacker] += RoundToFloor(actualDamage); // 将浮点数伤害转换为整数并累加
-        //PrintToChatAll("[DEBUG] %N 对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
+            // 使用 L4D2_GetIntWeaponAttribute 获取武器类型
+            int weaponType = L4D2_GetIntWeaponAttribute(weaponClass, L4D2IWA_WeaponType);
 
-        // 如果是枪械类武器，统计命中次数（g_iHits）
-        if (isFirearm)
-        {
-            // 获取武器类型
-            WeaponCategory category = GetWeaponCategory(weapon);
+            // 判断是否为近战武器
+            bool isMelee = (weaponType == view_as<int>(WEAPONTYPE_MELEE));
 
-            // 统计特感命中数（g_iHits）
-            if (category == WC_SHOTGUN)
+            // 判断是否为枪械类武器
+            bool isFirearm = (weaponType == view_as<int>(WEAPONTYPE_PISTOL) ||
+                             weaponType == view_as<int>(WEAPONTYPE_SMG) ||
+                             weaponType == view_as<int>(WEAPONTYPE_RIFLE) ||
+                             weaponType == view_as<int>(WEAPONTYPE_SHOTGUN) ||
+                             weaponType == view_as<int>(WEAPONTYPE_SNIPERRIFLE) ||
+                             weaponType == view_as<int>(WEAPONTYPE_MACHINEGUN));
+
+            // 只统计子弹类伤害或近战伤害
+            if (!(damagetype & DMG_BULLET) && !(damagetype & DMG_BUCKSHOT) && !isMelee) return Plugin_Continue;
+
+            // 获取特感的当前血量（转换为浮点数）
+            float health = float(GetEntProp(victim, Prop_Data, "m_iHealth"));
+
+            // 计算实际造成的伤害，防止计算溢出
+            float actualDamage = damage;
+            if (actualDamage > health)
             {
-                // 霰弹枪命中处理：同一射击周期内仅统计一次
-                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                    !g_bShotgunHitRegistered[attacker])
+                actualDamage = health; // 如果伤害超过当前血量，只记录剩余血量
+            }
+
+            // 统计对特感造成的伤害(g_iDamageSI)
+            g_iDamageSI[attacker] += RoundToFloor(actualDamage); // 将浮点数伤害转换为整数并累加
+            //PrintToChatAll("[DEBUG] %N 对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
+
+            // 如果是枪械类武器，统计命中次数（g_iHits）
+            if (isFirearm)
+            {
+                // 获取武器类型
+                WeaponCategory category = GetWeaponCategory(weapon);
+
+                // 统计特感命中数（g_iHits）
+                if (category == WC_SHOTGUN)
+                {
+                    // 霰弹枪命中处理：同一射击周期内仅统计一次
+                    if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
+                        !g_bShotgunHitRegistered[attacker])
+                    {
+                        g_iHits[attacker]++;
+                        g_bShotgunHitRegistered[attacker] = true;
+                        //PrintToChatAll("[DEBUG] %N 使用喷子命中特感 [%N]", attacker, victim);
+                    }
+                }
+                else // 其他武器正常统计
                 {
                     g_iHits[attacker]++;
-                    g_bShotgunHitRegistered[attacker] = true;
-                    //PrintToChatAll("[DEBUG] %N 使用喷子命中特感 [%N]", attacker, victim);
+                    //PrintToChatAll("[DEBUG] %N 命中特感 [%N]", attacker, victim);
                 }
-            }
-            else // 其他武器正常统计
-            {
-                g_iHits[attacker]++;
-                //PrintToChatAll("[DEBUG] %N 命中特感 [%N]", attacker, victim);
             }
         }
     }
@@ -458,21 +470,25 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 {
     if (IsValidHumanSurvivor(attacker))
     {
-        // 统计爆头
-        if (hitgroup == HITGROUP_HEAD)
+        // 只统计枪械武器的爆头次数
+        if (IsFirearm(GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon")))
         {
-            // 如果是霰弹枪，确保每次射击只统计一次爆头
-            if (IsShotgun(GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon")))
+            // 统计爆头
+            if (hitgroup == HITGROUP_HEAD)
             {
-                if (!g_bShotgunHeadshotRegistered[attacker])
+                // 如果是霰弹枪，确保每次射击只统计一次爆头
+                if (IsShotgun(GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon")))
+                {
+                    if (!g_bShotgunHeadshotRegistered[attacker])
+                    {
+                        g_iHeadshots[attacker]++;
+                        g_bShotgunHeadshotRegistered[attacker] = true;
+                    }
+                }
+                else // 其他武器正常统计
                 {
                     g_iHeadshots[attacker]++;
-                    g_bShotgunHeadshotRegistered[attacker] = true;
                 }
-            }
-            else // 其他武器正常统计
-            {
-                g_iHeadshots[attacker]++;
             }
         }
     }
@@ -485,22 +501,26 @@ public Action OnTakeDamage_Tank(int victim, int &attacker, int &inflictor, float
 {
     if (IsValidHumanSurvivor(attacker))
     {
-        // 获取武器类型
-        WeaponCategory category = GetWeaponCategory(weapon);
-
-        // 霰弹枪特殊处理：每次射击只统计一次命中
-        if (category == WC_SHOTGUN)
+        // 只统计枪械类武器的
+        if (IsFirearm(weapon))
         {
-            if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                !g_bShotgunHitRegistered[attacker])
+            // 获取武器类型
+            WeaponCategory category = GetWeaponCategory(weapon);
+
+            // 霰弹枪特殊处理：每次射击只统计一次命中
+            if (category == WC_SHOTGUN)
+            {
+                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
+                    !g_bShotgunHitRegistered[attacker])
+                {
+                    g_iTankHits[attacker]++;
+                    g_bShotgunHitRegistered[attacker] = true;
+                }
+            }
+            else // 其他武器正常统计
             {
                 g_iTankHits[attacker]++;
-                g_bShotgunHitRegistered[attacker] = true;
             }
-        }
-        else // 其他武器正常统计
-        {
-            g_iTankHits[attacker]++;
         }
     }
     return Plugin_Continue;
@@ -511,22 +531,26 @@ public Action OnTakeDamage_TankRock(int victim, int &attacker, int &inflictor, f
 {
     if (IsValidHumanSurvivor(attacker))
     {
-        // 获取武器类型
-        WeaponCategory category = GetWeaponCategory(weapon);
-
-        // 霰弹枪特殊处理：只要击中一次就算命中
-        if (category == WC_SHOTGUN)
+        // 只统计枪械类武器的
+        if (IsFirearm(weapon))
         {
-            if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                !g_bShotgunHitRegistered[attacker])
+            // 获取武器类型
+            WeaponCategory category = GetWeaponCategory(weapon);
+
+            // 霰弹枪特殊处理：只要击中一次就算命中
+            if (category == WC_SHOTGUN)
+            {
+                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
+                    !g_bShotgunHitRegistered[attacker])
+                {
+                    g_iTankRockHits[attacker]++;
+                    g_bShotgunHitRegistered[attacker] = true;
+                }
+            }
+            else // 其他武器正常统计
             {
                 g_iTankRockHits[attacker]++;
-                g_bShotgunHitRegistered[attacker] = true;
             }
-        }
-        else // 其他武器正常统计
-        {
-            g_iTankRockHits[attacker]++;
         }
     }
     return Plugin_Continue;
@@ -1017,4 +1041,21 @@ bool IsShotgun(int weapon)
     GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
 
     return StrContains(weaponClass, "shotgun") != -1;
+}
+
+//判断是否是枪械类武器
+bool IsFirearm(int weapon)
+{
+    if (weapon == -1) return false;
+
+    char weaponClass[64];
+    GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
+
+    // 判断是否为枪械类武器
+    return (StrContains(weaponClass, "pistol") != -1 ||
+            StrContains(weaponClass, "smg") != -1 ||
+            StrContains(weaponClass, "rifle") != -1 ||
+            StrContains(weaponClass, "shotgun") != -1 ||
+            StrContains(weaponClass, "sniper") != -1 ||
+            StrContains(weaponClass, "hunting_rifle") != -1);
 }
