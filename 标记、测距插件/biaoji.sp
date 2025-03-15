@@ -40,12 +40,12 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
     //插件开关
-    g_cvPluginEnabled = CreateConVar("bjkg", "0", "插件开关 [1 → 开启 | 0 → 关闭]", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvPluginEnabled = CreateConVar("bjkg", "1", "插件开关 [1 → 开启 | 0 → 关闭]", FCVAR_NONE, true, 0.0, true, 1.0);
 
     //管理员命令
     RegAdminCmd("sm_biaoji1", Command_MarkPoint1, ADMFLAG_GENERIC, "标记、取消坐标点1");
     RegAdminCmd("sm_biaoji2", Command_MarkPoint2, ADMFLAG_GENERIC, "标记、取消坐标点2");
-    RegAdminCmd("sm_biaoji", Command_ToggleMenu, ADMFLAG_GENERIC, "打开、关闭坐标传送栏");
+    RegAdminCmd("sm_biaoji", Command_ToggleMenu, ADMFLAG_GENERIC, "打开坐标传送栏");
     RegAdminCmd("sm_si", Command_SpawnSI, ADMFLAG_GENERIC, "打开特感生成表");
 
     //注册插件开关的ConVar
@@ -207,10 +207,6 @@ public Action Command_ToggleMenu(int client, int args)
     if (g_bShowMenu[client])
     {
         ShowPointsMenu(client); // 显示左侧栏菜单
-    }
-    else
-    {
-        PrintToChat(client, "关闭坐标栏");
     }
 
     return Plugin_Handled;
@@ -441,7 +437,7 @@ public Action Timer_DisplayTotalDamage(Handle timer, any attacker)
         if (IsClientInGame(i) && g_fDamageCache[attacker][i] > 0.0)
         {
             // 显示总伤害值
-            PrintToChat(attacker, "\x01[总伤] \x03对目标造成 \x04%.2f点 \x03伤害.", g_fDamageCache[attacker][i]);
+            PrintToChat(attacker, "\x01[总伤] \x03对目标造成的总伤害 \x04%.2f点 \x03.", g_fDamageCache[attacker][i]);
 
             // 清空伤害缓存
             g_fDamageCache[attacker][i] = 0.0;
