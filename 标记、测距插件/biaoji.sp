@@ -18,7 +18,6 @@ float g_fDamageCache[MAXPLAYERS + 1][MAXPLAYERS + 1];
 bool g_bPluginEnabled;
 bool g_bPoint1Set[MAXPLAYERS + 1];
 bool g_bPoint2Set[MAXPLAYERS + 1];
-bool g_bShowMenu[MAXPLAYERS + 1];
 bool g_bDamageActive[MAXPLAYERS + 1];
 
 int g_iWitchModel1[MAXPLAYERS + 1];
@@ -40,7 +39,7 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
     //插件开关
-    g_cvPluginEnabled = CreateConVar("bjkg", "1", "插件开关 [1 → 开启 | 0 → 关闭]", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvPluginEnabled = CreateConVar("bjkg", "0", "插件开关 [1 → 开启 | 0 → 关闭]", FCVAR_NONE, true, 0.0, true, 1.0);
 
     //管理员命令
     RegAdminCmd("sm_biaoji1", Command_MarkPoint1, ADMFLAG_GENERIC, "标记、取消坐标点1");
@@ -202,13 +201,7 @@ public Action Command_ToggleMenu(int client, int args)
         return Plugin_Handled;
     }
 
-    g_bShowMenu[client] = !g_bShowMenu[client];
-
-    if (g_bShowMenu[client])
-    {
-        ShowPointsMenu(client); // 显示左侧栏菜单
-    }
-
+    ShowPointsMenu(client);
     return Plugin_Handled;
 }
 
