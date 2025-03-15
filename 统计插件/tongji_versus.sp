@@ -442,7 +442,7 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
             bool isMelee = (weaponType == view_as<int>(WEAPONTYPE_MELEE));
 
             // 判断是否为枪械类武器
-            bool isFirearm = (weaponType == view_as<int>(WEAPONTYPE_PISTOL) ||
+            bool isFirearm2 = (weaponType == view_as<int>(WEAPONTYPE_PISTOL) ||
                              weaponType == view_as<int>(WEAPONTYPE_SMG) ||
                              weaponType == view_as<int>(WEAPONTYPE_RIFLE) ||
                              weaponType == view_as<int>(WEAPONTYPE_SHOTGUN) ||
@@ -467,7 +467,7 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
             //PrintToChatAll("[DEBUG] %N 对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
 
             // 如果是枪械类武器，统计命中次数（g_iHits）
-            if (isFirearm)
+            if (isFirearm2)
             {
                 // 获取武器类型
                 WeaponCategory category = GetWeaponCategory(weapon);
