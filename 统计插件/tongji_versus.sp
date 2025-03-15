@@ -186,6 +186,7 @@ void InitLogDirectory()
 public void OnClientDisconnect(int client)
 {
     ResetClientStats(client);
+    g_bHasPrintedStats[client] = false;
 }
 
 // 特感控制事件
