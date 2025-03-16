@@ -1,3 +1,11 @@
+/*
+* 更新日志：
+    * v2.3b - v2.3.1 ：
+    不小心堆了点屎，
+    没想到OnEntityCreated里挂钩只能识别到ai特感，
+    现在丢到了OnPlayerSpawn里来挂钩统计特感的命中、爆头命中、伤害量等等。。
+*/
+
 #pragma semicolon 1
 #pragma newdecls required
 
@@ -17,6 +25,17 @@ enum WeaponCategory
     WC_SHOTGUN,
     WC_FULLAUTO,
     WC_SEMIAUTO
+};
+
+enum ZombieClass
+{
+    ZC_Smoker = 1,
+    ZC_Boomer = 2,
+    ZC_Hunter = 3,
+    ZC_Spitter = 4,
+    ZC_Jockey = 5,
+    ZC_Charger = 6,
+    ZC_Tank = 8
 };
 
 // 玩家统计数据结构
@@ -70,7 +89,7 @@ public Plugin myinfo =
     name = "星云猫猫统计",
     author = "Seiunsky Maomao",
     description = "统计玩家对于特感的各种数据.",
-    version = "2.3b",
+    version = "2.3.1",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -126,7 +145,6 @@ public void OnRoundIsLive()  // 移除参数，使其符合 readyup 插件的前
     
     PrintToChatAll("\x01[!] \x03回合开始, 星云猫猫统计\x04已激活\x03.");
 }
-
 
 // 每回合重置玩家统计
 void ResetClientStats(int client)
@@ -229,6 +247,7 @@ public Action Event_PlayerIncap(Event event, const char[] name, bool dontBroadca
 }
 
 // 实体生成事件过滤处理，谢谢Hi提供的思路
+// 注意，这个只能统计到ai实体
 public void OnEntityCreated(int entity, const char[] classname)
 {
     //其他命中
@@ -236,22 +255,10 @@ public void OnEntityCreated(int entity, const char[] classname)
     {
         SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage);
     }
-    // 过滤出克
-    else if (StrEqual(classname, "tank"))
-    {
-        SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage_Tank);
-    }
     // 过滤出克的饼
     else if (StrEqual(classname, "tank_rock"))
     {
         SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage_TankRock);
-    }
-    // 过滤6只特感
-    else if (StrEqual(classname, "smoker") || StrEqual(classname, "hunter") || StrEqual(classname, "boomer") || 
-             StrEqual(classname, "spitter") || StrEqual(classname, "jockey") || StrEqual(classname, "charger"))
-    {
-        SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage_SI);     //用来统计伤害和命中
-        SDKHook(entity, SDKHook_TraceAttack, OnTraceAttack);        //用来统计爆头
     }
 }
 
@@ -414,10 +421,29 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 public void OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     int client = GetClientOfUserId(event.GetInt("userid"));
-    if (IsValidInfected(client)) // 确保特感
+    
+    // 确保是特感玩家
+    if (IsValidInfected(client))
     {
-        g_bSIDeathRegistered[client] = false; // 重置击杀标记
-        //PrintToChatAll("[DEBUG] 特感 [%N] 生成或复活，重置击杀标记。", client);
+        //重置特感的击杀标记
+        g_bSIDeathRegistered[client] = false;
+
+        //特感类别
+        ZombieClass zClass = view_as<ZombieClass>(GetEntProp(client, Prop_Send, "m_zombieClass"));
+
+        // 根据特感类别挂钩不同的事件
+        switch (zClass)
+        {
+            case ZC_Smoker, ZC_Hunter, ZC_Boomer, ZC_Jockey, ZC_Spitter, ZC_Charger:
+            {
+                SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage_SI);     // 用来统计伤害和命中
+                SDKHook(client, SDKHook_TraceAttack, OnTraceAttack);        // 用来统计爆头
+            }
+            case ZC_Tank:
+            {
+                SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage_Tank);   // 用来统计克的
+            }
+        }
     }
 }
 
