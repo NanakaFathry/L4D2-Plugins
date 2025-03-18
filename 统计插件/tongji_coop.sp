@@ -67,7 +67,7 @@ public Plugin myinfo =
     name = "星云猫猫统计",
     author = "Seiunsky Maomao",
     description = "统计玩家对于特感的各种数据.",
-    version = "2.3",
+    version = "2.3.2",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -1004,11 +1004,23 @@ WeaponCategory GetWeaponCategory(int weapon)
     char cls[32];
     GetEntityClassname(weapon, cls, sizeof(cls));
     
-    if (StrContains(cls, "shotgun") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "shotgun_chrome") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "pumpshotgun") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "shotgun_spas") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "autoshotgun") != -1) return WC_SHOTGUN;
     if (StrContains(cls, "smg") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "smg_silenced") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "smg_mp5") != -1) return WC_FULLAUTO;
     if (StrContains(cls, "rifle") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_desert") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_ak47") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_sg552") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_m60") != -1) return WC_FULLAUTO;
     if (StrContains(cls, "pistol") != -1) return WC_SEMIAUTO;
-    if (StrContains(cls, "sniper") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "pistol_magnum") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "sniper_military") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "sniper_scout") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "sniper_awp") != -1) return WC_SEMIAUTO;
     if (StrContains(cls, "hunting_rifle") != -1) return WC_SEMIAUTO;
     return WC_INVALID;
 }
@@ -1043,7 +1055,7 @@ bool IsShotgun(int weapon)
     return StrContains(weaponClass, "shotgun") != -1;
 }
 
-//判断是否是枪械类武器
+//判断是否是枪械武器，排除麻辣烫等火焰攻击次数
 bool IsFirearm(int weapon)
 {
     if (weapon == -1) return false;
@@ -1053,9 +1065,21 @@ bool IsFirearm(int weapon)
 
     // 判断是否为枪械类武器
     return (StrContains(weaponClass, "pistol") != -1 ||
+            StrContains(weaponClass, "pistol_magnum") != -1 ||
+            StrContains(weaponClass, "rifle_m60") != -1 ||
             StrContains(weaponClass, "smg") != -1 ||
+            StrContains(weaponClass, "smg_silenced") != -1 ||
+            StrContains(weaponClass, "smg_mp5") != -1 ||
             StrContains(weaponClass, "rifle") != -1 ||
-            StrContains(weaponClass, "shotgun") != -1 ||
-            StrContains(weaponClass, "sniper") != -1 ||
+            StrContains(weaponClass, "rifle_desert") != -1 ||
+            StrContains(weaponClass, "rifle_ak47") != -1 ||
+            StrContains(weaponClass, "rifle_sg552") != -1 ||
+            StrContains(weaponClass, "pumpshotgun") != -1 ||
+            StrContains(weaponClass, "shotgun_chrome") != -1 ||
+            StrContains(weaponClass, "shotgun_spas") != -1 ||
+            StrContains(weaponClass, "autoshotgun") != -1 ||
+            StrContains(weaponClass, "sniper_military") != -1 ||
+            StrContains(weaponClass, "sniper_scout") != -1 ||
+            StrContains(weaponClass, "sniper_awp") != -1 ||
             StrContains(weaponClass, "hunting_rifle") != -1);
 }

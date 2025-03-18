@@ -1,9 +1,10 @@
 /*
 * 更新日志：
-    * v2.3b - v2.3.1 ：
+    * v2.3b - v2.3.2 ：
     不小心堆了点屎，
     没想到OnEntityCreated里挂钩只能识别到ai特感，
     现在丢到了OnPlayerSpawn里来挂钩统计特感的命中、爆头命中、伤害量等等。。
+    另外完善一下武器分类、类别。
 */
 
 #pragma semicolon 1
@@ -89,7 +90,7 @@ public Plugin myinfo =
     name = "星云猫猫统计",
     author = "Seiunsky Maomao",
     description = "统计玩家对于特感的各种数据.",
-    version = "2.3.1",
+    version = "2.3.2b",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -361,31 +362,33 @@ public Action PlayerDeath_Event(Event event, const char[] name, bool dontBroadca
     return Plugin_Continue;
 }
 
+/*
 // 游戏自带的infected_hurt事件,也可以用来统计小僵尸命中
-//public Action Event_InfectedHurt(Event event, const char[] name, bool dontBroadcast)
-//{
-//    int attacker = GetClientOfUserId(event.GetInt("attacker"));
-//    if (IsValidHumanSurvivor(attacker))
-//    {
-//        int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
-//
-//        // 如果是霰弹枪，确保每次射击只统计一次命中
-//        if (IsShotgun(weapon))
-//        {
-//            if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-//                !g_bShotgunHitRegistered[attacker])
-//            {
-//                g_iEffectiveHits[attacker]++;
-//                g_bShotgunHitRegistered[attacker] = true;
-//            }
-//        }
-//        else // 其他武器正常统计
-//        {
-//            g_iEffectiveHits[attacker]++;
-//        }
-//    }
-//    return Plugin_Continue;
-//}
+public Action Event_InfectedHurt(Event event, const char[] name, bool dontBroadcast)
+{
+    int attacker = GetClientOfUserId(event.GetInt("attacker"));
+    if (IsValidHumanSurvivor(attacker))
+    {
+        int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
+
+        // 如果是霰弹枪，确保每次射击只统计一次命中
+        if (IsShotgun(weapon))
+        {
+            if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
+                !g_bShotgunHitRegistered[attacker])
+            {
+                g_iEffectiveHits[attacker]++;
+                g_bShotgunHitRegistered[attacker] = true;
+            }
+        }
+        else // 其他武器正常统计
+        {
+            g_iEffectiveHits[attacker]++;
+        }
+    }
+    return Plugin_Continue;
+}
+*/
 
 // 过滤后的witch,xss实体命中处理
 public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
@@ -454,7 +457,7 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
 
     if (IsValidHumanSurvivor(attacker))
     {
-        // 只统计枪械武器的命中次数
+        // 只统计枪械武器
         if (IsFirearm(weapon))
         {
             // 获取武器类名
@@ -466,14 +469,6 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
 
             // 判断是否为近战武器
             bool isMelee = (weaponType == view_as<int>(WEAPONTYPE_MELEE));
-
-            // 判断是否为枪械类武器
-            bool isFirearm2 = (weaponType == view_as<int>(WEAPONTYPE_PISTOL) ||
-                             weaponType == view_as<int>(WEAPONTYPE_SMG) ||
-                             weaponType == view_as<int>(WEAPONTYPE_RIFLE) ||
-                             weaponType == view_as<int>(WEAPONTYPE_SHOTGUN) ||
-                             weaponType == view_as<int>(WEAPONTYPE_SNIPERRIFLE) ||
-                             weaponType == view_as<int>(WEAPONTYPE_MACHINEGUN));
 
             // 只统计子弹类伤害或近战伤害
             if (!(damagetype & DMG_BULLET) && !(damagetype & DMG_BUCKSHOT) && !isMelee) return Plugin_Continue;
@@ -493,28 +488,25 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
             //PrintToChatAll("[DEBUG] %N 对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
 
             // 如果是枪械类武器，统计命中次数（g_iHits）
-            if (isFirearm2)
-            {
-                // 获取武器类型
-                WeaponCategory category = GetWeaponCategory(weapon);
+            // 获取武器类型
+            WeaponCategory category = GetWeaponCategory(weapon);
 
-                // 统计特感命中数（g_iHits）
-                if (category == WC_SHOTGUN)
-                {
-                    // 霰弹枪命中处理：同一射击周期内仅统计一次
-                    if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                        !g_bShotgunHitRegistered[attacker])
-                    {
-                        g_iHits[attacker]++;
-                        g_bShotgunHitRegistered[attacker] = true;
-                        //PrintToChatAll("[DEBUG] %N 使用喷子命中特感 [%N]", attacker, victim);
-                    }
-                }
-                else // 其他武器正常统计
+            // 统计特感命中数（g_iHits）
+            if (category == WC_SHOTGUN)
+            {
+                // 霰弹枪命中处理：同一射击周期内仅统计一次
+                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
+                    !g_bShotgunHitRegistered[attacker])
                 {
                     g_iHits[attacker]++;
-                    //PrintToChatAll("[DEBUG] %N 命中特感 [%N]", attacker, victim);
+                    g_bShotgunHitRegistered[attacker] = true;
+                    //PrintToChatAll("[DEBUG] %N 使用喷子命中特感 [%N]", attacker, victim);
                 }
+            }
+            else // 其他武器正常统计
+            {
+                g_iHits[attacker]++;
+                //PrintToChatAll("[DEBUG] %N 命中特感 [%N]", attacker, victim);
             }
         }
     }
@@ -1066,11 +1058,23 @@ WeaponCategory GetWeaponCategory(int weapon)
     char cls[32];
     GetEntityClassname(weapon, cls, sizeof(cls));
     
-    if (StrContains(cls, "shotgun") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "shotgun_chrome") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "pumpshotgun") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "shotgun_spas") != -1) return WC_SHOTGUN;
+    if (StrContains(cls, "autoshotgun") != -1) return WC_SHOTGUN;
     if (StrContains(cls, "smg") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "smg_silenced") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "smg_mp5") != -1) return WC_FULLAUTO;
     if (StrContains(cls, "rifle") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_desert") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_ak47") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_sg552") != -1) return WC_FULLAUTO;
+    if (StrContains(cls, "rifle_m60") != -1) return WC_FULLAUTO;
     if (StrContains(cls, "pistol") != -1) return WC_SEMIAUTO;
-    if (StrContains(cls, "sniper") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "pistol_magnum") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "sniper_military") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "sniper_scout") != -1) return WC_SEMIAUTO;
+    if (StrContains(cls, "sniper_awp") != -1) return WC_SEMIAUTO;
     if (StrContains(cls, "hunting_rifle") != -1) return WC_SEMIAUTO;
     return WC_INVALID;
 }
@@ -1115,9 +1119,21 @@ bool IsFirearm(int weapon)
 
     // 判断是否为枪械类武器
     return (StrContains(weaponClass, "pistol") != -1 ||
+            StrContains(weaponClass, "pistol_magnum") != -1 ||
+            StrContains(weaponClass, "rifle_m60") != -1 ||
             StrContains(weaponClass, "smg") != -1 ||
+            StrContains(weaponClass, "smg_silenced") != -1 ||
+            StrContains(weaponClass, "smg_mp5") != -1 ||
             StrContains(weaponClass, "rifle") != -1 ||
-            StrContains(weaponClass, "shotgun") != -1 ||
-            StrContains(weaponClass, "sniper") != -1 ||
+            StrContains(weaponClass, "rifle_desert") != -1 ||
+            StrContains(weaponClass, "rifle_ak47") != -1 ||
+            StrContains(weaponClass, "rifle_sg552") != -1 ||
+            StrContains(weaponClass, "pumpshotgun") != -1 ||
+            StrContains(weaponClass, "shotgun_chrome") != -1 ||
+            StrContains(weaponClass, "shotgun_spas") != -1 ||
+            StrContains(weaponClass, "autoshotgun") != -1 ||
+            StrContains(weaponClass, "sniper_military") != -1 ||
+            StrContains(weaponClass, "sniper_scout") != -1 ||
+            StrContains(weaponClass, "sniper_awp") != -1 ||
             StrContains(weaponClass, "hunting_rifle") != -1);
 }
