@@ -5,6 +5,10 @@
     没想到OnEntityCreated里挂钩只能识别到ai特感，
     现在丢到了OnPlayerSpawn里来挂钩统计特感的命中、爆头命中、伤害量等等。。
     另外完善一下武器分类、类别。
+
+    * v2.3.2 - v2.3.3 ：
+    移除了原有的霰弹枪时间窗口统计方式，用另一种方式来统计霰弹枪命中。
+    用堆史的办法修复日志打印重复的毛病。
 */
 
 #pragma semicolon 1
@@ -71,16 +75,16 @@ int g_iLastRoundEffectiveHits[MAXPLAYERS + 1];
 int g_iLastRoundTankHits[MAXPLAYERS + 1];
 int g_iLastRoundTankRockHits[MAXPLAYERS + 1];
 
-float g_fLastShotTime[MAXPLAYERS + 1];
-float g_fLastShotgunShotTime[MAXPLAYERS + 1];
 //float g_fLastTongjiPrintTime[MAXPLAYERS + 1];
 
+bool g_bCurrentShotHitRegistered[MAXPLAYERS + 1];
 bool g_bShotgunHitRegistered[MAXPLAYERS + 1];
 bool g_bShotgunHeadshotRegistered[MAXPLAYERS + 1];
 bool bIsPouncing[MAXPLAYERS + 1];
 bool bIsHurt[MAXPLAYERS + 1];
 bool g_bSIDeathRegistered[MAXPLAYERS + 1];
 bool g_bHasPrintedStats[MAXPLAYERS + 1];
+bool g_bHasLoggedStats = false;
 bool g_bIsRoundLive = false;
 
 ConVar g_cvAutoPrintStats;
@@ -90,7 +94,7 @@ public Plugin myinfo =
     name = "星云猫猫统计",
     author = "Seiunsky Maomao",
     description = "统计玩家对于特感的各种数据.",
-    version = "2.3.2b",
+    version = "2.3.3-Versus",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -133,6 +137,7 @@ public void OnPluginStart()
 public void OnRoundIsLive()  // 移除参数，使其符合 readyup 插件的前向声明
 {
     g_bIsRoundLive = true;
+    g_bHasLoggedStats = false;
     
     // 为所有客户端重置统计数据
     for (int client = 1; client <= MaxClients; client++)
@@ -153,7 +158,6 @@ void ResetClientStats(int client)
     g_iShots[client] = 0;
     g_iHits[client] = 0;
     g_iHeadshots[client] = 0;
-    g_fLastShotTime[client] = 0.0;
     g_iShotgunMidairHunters[client] = 0;
     g_iMeleeMidairHunters[client] = 0;
     g_iSMGUnder10Kills[client] = 0;
@@ -261,6 +265,11 @@ public void OnEntityCreated(int entity, const char[] classname)
     {
         SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage_TankRock);
     }
+    // 过滤出克
+    else if (StrEqual(classname, "tank"))
+    {
+        SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage_Tank);
+    }
 }
 
 // 更新 bIsPouncing 和 bIsHurt 状态，给空爆统计
@@ -270,10 +279,10 @@ public Action AbilityUse_Event(Event event, const char[] name, bool dontBroadcas
     char abilityName[64];
     GetEventString(event, "ability", abilityName, sizeof(abilityName));
 
-    if (IsValidInfected(user))
+    if (IsValidInfected(user) && view_as<ZombieClass>(GetEntProp(user, Prop_Send, "m_zombieClass")) == ZC_Hunter)
     {
         // 处理 Hunter 的飞扑状态
-        if (StrEqual(abilityName, "ability_lunge", false))
+        if (StrEqual(abilityName, "ability_lunge", true) && !bIsPouncing[user])
         {
             bIsPouncing[user] = true;
             bIsHurt[user] = (GetClientHealth(user) < iPounceDmgInt);
@@ -284,7 +293,6 @@ public Action AbilityUse_Event(Event event, const char[] name, bool dontBroadcas
     return Plugin_Continue;
 }
 
-// 空爆事件统计等
 // 现在吧对6只特感的击杀量（g_iKilledSI）转移到这里了，这里方便点
 public Action PlayerDeath_Event(Event event, const char[] name, bool dontBroadcast)
 {
@@ -296,23 +304,22 @@ public Action PlayerDeath_Event(Event event, const char[] name, bool dontBroadca
     if (!IsValidHumanSurvivor(attacker) || !IsValidInfected(victim)) return Plugin_Continue;
 
     int zClass = GetEntProp(victim, Prop_Send, "m_zombieClass");
+    int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
 
-    // 只统计枪械武器
-    if (IsFirearm(GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon")))
+    // 伤害统计枪械+近战，hunter在多加分开统计
+    if (!g_bSIDeathRegistered[victim])
     {
-        // 先统计所有6只特感的击杀量
-        if (!g_bSIDeathRegistered[victim])
+        if (IsFirearm(weapon) || IsMelee(weapon))
         {
             g_bSIDeathRegistered[victim] = true;
             g_iKilledSI[attacker]++;
-            //PrintToChatAll("[DEBUG] %N 击杀了特感 [%N]!", attacker, victim);
+            //PrintToChatAll("[DEBUG] %N 使用%s击杀了特感 [%N]!", attacker, IsMelee(weapon) ? "近战武器" : "枪械", victim);
         }
 
         // 在进行Hunter的空爆统计
         if (zClass == ZC_HUNTER)
         {
             int damagetype = event.GetInt("type");
-            int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
 
             if (weapon == -1) return Plugin_Continue;
 
@@ -397,17 +404,16 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
 
     if (IsValidHumanSurvivor(attacker))
     {
-        // 只统计枪械武器的命中次数,麻辣烫等不能统计！！！
         if (IsFirearm(weapon))
         {
-            // 直接处理伤害事件来记录
-            if (IsShotgun(weapon))      //霰弹枪特殊处理
+            WeaponCategory category = GetWeaponCategory(weapon);
+
+            if (category == WC_SHOTGUN)
             {
-                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                    !g_bShotgunHitRegistered[attacker])
+                if (!g_bCurrentShotHitRegistered[attacker])
                 {
                     g_iEffectiveHits[attacker]++;
-                    g_bShotgunHitRegistered[attacker] = true;
+                    g_bCurrentShotHitRegistered[attacker] = true;
                 }
             }
             else
@@ -416,7 +422,6 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
             }
         }
     }
-
     return Plugin_Continue;
 }
 
@@ -429,7 +434,7 @@ public void OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
     if (IsValidInfected(client))
     {
         //重置特感的击杀标记
-        g_bSIDeathRegistered[client] = false;
+        g_bCurrentShotHitRegistered[client] = false;
 
         //特感类别
         ZombieClass zClass = view_as<ZombieClass>(GetEntProp(client, Prop_Send, "m_zombieClass"));
@@ -444,7 +449,7 @@ public void OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
             }
             case ZC_Tank:
             {
-                SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage_Tank);   // 用来统计克的
+                SDKHook(client, SDKHook_OnTakeDamage, OnTakeDamage_Tank);   // 用来统计克的,这个统计人工tank
             }
         }
     }
@@ -457,7 +462,7 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
 
     if (IsValidHumanSurvivor(attacker))
     {
-        // 只统计枪械武器
+        // 只统计枪械武器的命中次数
         if (IsFirearm(weapon))
         {
             // 获取武器类名
@@ -483,7 +488,7 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
                 actualDamage = health; // 如果伤害超过当前血量，只记录剩余血量
             }
 
-            // 统计对特感造成的伤害(g_iDamageSI)
+            // 统计对特感造成的伤害(g_iDamageSI)，包含枪械和近战武器
             g_iDamageSI[attacker] += RoundToFloor(actualDamage); // 将浮点数伤害转换为整数并累加
             //PrintToChatAll("[DEBUG] %N 对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
 
@@ -491,23 +496,38 @@ public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &
             // 获取武器类型
             WeaponCategory category = GetWeaponCategory(weapon);
 
-            // 统计特感命中数（g_iHits）
+            // 统计特感命中数（g_iHits），仅限枪械武器
             if (category == WC_SHOTGUN)
             {
-                // 霰弹枪命中处理：同一射击周期内仅统计一次
-                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                    !g_bShotgunHitRegistered[attacker])
+                // 霰弹枪命中:每次射击只统计一次命中
+                if (!g_bCurrentShotHitRegistered[attacker])
                 {
                     g_iHits[attacker]++;
-                    g_bShotgunHitRegistered[attacker] = true;
+                    g_bCurrentShotHitRegistered[attacker] = true;
                     //PrintToChatAll("[DEBUG] %N 使用喷子命中特感 [%N]", attacker, victim);
                 }
             }
-            else // 其他武器正常统计
+            else if (category != WC_INVALID && !isMelee) // 其他枪械武器正常统计，排除近战武器
             {
                 g_iHits[attacker]++;
                 //PrintToChatAll("[DEBUG] %N 命中特感 [%N]", attacker, victim);
             }
+        }
+        else if (IsMelee(weapon)) // 如果是近战武器，只统计伤害，不统计命中次数
+        {
+            // 获取特感的当前血量（转换为浮点数）
+            float health = float(GetEntProp(victim, Prop_Data, "m_iHealth"));
+
+            // 计算实际造成的伤害，防止计算溢出
+            float actualDamage = damage;
+            if (actualDamage > health)
+            {
+                actualDamage = health; // 如果伤害超过当前血量，只记录剩余血量
+            }
+
+            // 统计对特感造成的伤害(g_iDamageSI)，仅限近战武器
+            g_iDamageSI[attacker] += RoundToFloor(actualDamage); // 将浮点数伤害转换为整数并累加
+            //PrintToChatAll("[DEBUG] %N 使用近战武器对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
         }
     }
 
@@ -550,6 +570,8 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 // 对克攻击次数
 public Action OnTakeDamage_Tank(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
+    if (!g_bIsRoundLive) return Plugin_Continue;    // 添加回合检查
+    
     if (IsValidHumanSurvivor(attacker))
     {
         // 只统计枪械类武器的命中次数
@@ -561,11 +583,10 @@ public Action OnTakeDamage_Tank(int victim, int &attacker, int &inflictor, float
             // 霰弹枪特殊处理：每次射击只统计一次命中
             if (category == WC_SHOTGUN)
             {
-                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                    !g_bShotgunHitRegistered[attacker])
+                if (!g_bCurrentShotHitRegistered[attacker])
                 {
                     g_iTankHits[attacker]++;
-                    g_bShotgunHitRegistered[attacker] = true;
+                    g_bCurrentShotHitRegistered[attacker] = true;
                 }
             }
             else // 其他武器正常统计
@@ -580,6 +601,8 @@ public Action OnTakeDamage_Tank(int victim, int &attacker, int &inflictor, float
 // 对克丢出来的饼的攻击次数
 public Action OnTakeDamage_TankRock(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
+    if (!g_bIsRoundLive) return Plugin_Continue;    // 添加回合检查
+    
     if (IsValidHumanSurvivor(attacker))
     {
         // 只统计枪械类武器的命中次数
@@ -588,14 +611,13 @@ public Action OnTakeDamage_TankRock(int victim, int &attacker, int &inflictor, f
             // 获取武器类型
             WeaponCategory category = GetWeaponCategory(weapon);
 
-            // 霰弹枪特殊处理：只要击中一次就算命中
+            // 霰弹枪特殊处理：每次射击只统计一次命中
             if (category == WC_SHOTGUN)
             {
-                if (GetGameTime() - g_fLastShotgunShotTime[attacker] <= 0.1 && 
-                    !g_bShotgunHitRegistered[attacker])
+                if (!g_bCurrentShotHitRegistered[attacker])
                 {
                     g_iTankRockHits[attacker]++;
-                    g_bShotgunHitRegistered[attacker] = true;
+                    g_bCurrentShotHitRegistered[attacker] = true;
                 }
             }
             else // 其他武器正常统计
@@ -610,7 +632,7 @@ public Action OnTakeDamage_TankRock(int victim, int &attacker, int &inflictor, f
 // 武器射击事件处理
 public Action Event_WeaponFire(Event event, const char[] name, bool dontBroadcast)
 {
-    if (!g_bIsRoundLive) return Plugin_Continue;    //回合没被宣布开始时，则关闭
+    if (!g_bIsRoundLive) return Plugin_Continue;
 
     int client = GetClientOfUserId(event.GetInt("userid"));
     if (!IsValidHumanSurvivor(client)) return Plugin_Continue;
@@ -622,20 +644,17 @@ public Action Event_WeaponFire(Event event, const char[] name, bool dontBroadcas
     {
         case WC_SHOTGUN:
         {
-            g_iShots[client]++;     // 射击次数+1
-            g_fLastShotgunShotTime[client] = GetGameTime();
+            g_iShots[client]++;
+            g_bCurrentShotHitRegistered[client] = false;
             g_bShotgunHitRegistered[client] = false;
-            g_bShotgunHeadshotRegistered[client] = false;  // 重置霰弹枪爆头标记
+            g_bShotgunHeadshotRegistered[client] = false;
         }
         case WC_FULLAUTO:
         {
-            // 全自动武器每次射击事件计1次
             g_iShots[client]++;
-            g_fLastShotTime[client] = GetGameTime();
         }
         case WC_SEMIAUTO:
         {
-            // 半自动武器每次点击计1次
             g_iShots[client]++;
         }
     }
@@ -645,6 +664,15 @@ public Action Event_WeaponFire(Event event, const char[] name, bool dontBroadcas
 // 回合结束处理
 public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
+    // 如果已经记录过本轮统计，则跳过
+    if (g_bHasLoggedStats) 
+    {
+        return Plugin_Continue;
+    }
+    
+    // 设置已记录标记
+    g_bHasLoggedStats = true;
+
     char sDate[12], sTime[12];
     FormatTime(sDate, sizeof(sDate), "%Y-%m-%d");
     FormatTime(sTime, sizeof(sTime), "%H:%M:%S");
@@ -1136,4 +1164,15 @@ bool IsFirearm(int weapon)
             StrContains(weaponClass, "sniper_scout") != -1 ||
             StrContains(weaponClass, "sniper_awp") != -1 ||
             StrContains(weaponClass, "hunting_rifle") != -1);
+}
+
+// 判断是否为近战
+bool IsMelee(int weapon)
+{
+    if (weapon == -1) return false;
+
+    char weaponClass[64];
+    GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
+
+    return (StrContains(weaponClass, "melee") != -1);
 }
