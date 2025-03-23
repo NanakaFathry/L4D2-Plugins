@@ -458,76 +458,46 @@ public void OnPlayerSpawn(Event event, const char[] name, bool dontBroadcast)
 // 计算6只特感的命中次数（g_iHits）、对特感造成的伤害(g_iDamageSI)
 public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
-    if (!g_bIsRoundLive) return Plugin_Continue;    // 回合没被宣布开始时，则关闭
+    if (!g_bIsRoundLive) return Plugin_Continue;    // 回合未开始则返回
 
     if (IsValidHumanSurvivor(attacker))
     {
-        // 只统计枪械武器的命中次数
-        if (IsFirearm(weapon))
+        // 1. 计算实际伤害(包含近战和枪械)
+        if (IsFirearm(weapon) || IsMelee(weapon))
         {
-            // 获取武器类名
-            char weaponClass[64];
-            GetEdictClassname(weapon, weaponClass, sizeof(weaponClass));
-
-            // 使用 L4D2_GetIntWeaponAttribute 获取武器类型
-            int weaponType = L4D2_GetIntWeaponAttribute(weaponClass, L4D2IWA_WeaponType);
-
-            // 判断是否为近战武器
-            bool isMelee = (weaponType == view_as<int>(WEAPONTYPE_MELEE));
-
-            // 只统计子弹类伤害或近战伤害
-            if (!(damagetype & DMG_BULLET) && !(damagetype & DMG_BUCKSHOT) && !isMelee) return Plugin_Continue;
-
-            // 获取特感的当前血量（转换为浮点数）
+            // 获取特感当前血量
             float health = float(GetEntProp(victim, Prop_Data, "m_iHealth"));
-
-            // 计算实际造成的伤害，防止计算溢出
+            
+            // 计算实际伤害,避免溢出
             float actualDamage = damage;
             if (actualDamage > health)
             {
-                actualDamage = health; // 如果伤害超过当前血量，只记录剩余血量
+                actualDamage = health;
             }
+            
+            // 累加伤害统计
+            g_iDamageSI[attacker] += RoundToFloor(actualDamage);
+        }
 
-            // 统计对特感造成的伤害(g_iDamageSI)，包含枪械和近战武器
-            g_iDamageSI[attacker] += RoundToFloor(actualDamage); // 将浮点数伤害转换为整数并累加
-            //PrintToChatAll("[DEBUG] %N 对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
-
-            // 如果是枪械类武器，统计命中次数（g_iHits）
+        // 2. 枪械武器的命中统计 
+        if (IsFirearm(weapon))
+        {
             // 获取武器类型
             WeaponCategory category = GetWeaponCategory(weapon);
-
-            // 统计特感命中数（g_iHits），仅限枪械武器
+            
             if (category == WC_SHOTGUN)
             {
-                // 霰弹枪命中:每次射击只统计一次命中
+                // 霰弹枪每次射击只统计一次命中
                 if (!g_bCurrentShotHitRegistered[attacker])
                 {
                     g_iHits[attacker]++;
                     g_bCurrentShotHitRegistered[attacker] = true;
-                    //PrintToChatAll("[DEBUG] %N 使用喷子命中特感 [%N]", attacker, victim);
                 }
             }
-            else if (category != WC_INVALID && !isMelee) // 其他枪械武器正常统计，排除近战武器
+            else if (category != WC_INVALID) // 其他枪械武器正常统计，排除无效
             {
                 g_iHits[attacker]++;
-                //PrintToChatAll("[DEBUG] %N 命中特感 [%N]", attacker, victim);
             }
-        }
-        else if (IsMelee(weapon)) // 如果是近战武器，只统计伤害，不统计命中次数
-        {
-            // 获取特感的当前血量（转换为浮点数）
-            float health = float(GetEntProp(victim, Prop_Data, "m_iHealth"));
-
-            // 计算实际造成的伤害，防止计算溢出
-            float actualDamage = damage;
-            if (actualDamage > health)
-            {
-                actualDamage = health; // 如果伤害超过当前血量，只记录剩余血量
-            }
-
-            // 统计对特感造成的伤害(g_iDamageSI)，仅限近战武器
-            g_iDamageSI[attacker] += RoundToFloor(actualDamage); // 将浮点数伤害转换为整数并累加
-            //PrintToChatAll("[DEBUG] %N 使用近战武器对特感 [%N] 造成了 %d 点伤害", attacker, victim, RoundToFloor(actualDamage));
         }
     }
 
