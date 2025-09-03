@@ -191,11 +191,13 @@ public void Event_ControlStart(Event event, const char[] name, bool dontBroadcas
     g_hTimerMap.SetValue(sKey, hTimer);
 }
 
-//特感控制结束=，取消计时器
+//特感控制结束，取消计时器
 public void Event_ControlEnd(Event event, const char[] name, bool dontBroadcast)
 {
     int attacker = GetClientOfUserId(event.GetInt("userid"));
     int victim = GetClientOfUserId(event.GetInt("victim"));
+
+    if (attacker <= 0 || victim <= 0) return;
     
     char sKey[32];
     FormatEx(sKey, sizeof(sKey), "%d-%d", GetClientUserId(attacker), GetClientUserId(victim));
