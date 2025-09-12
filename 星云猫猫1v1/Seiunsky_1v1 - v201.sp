@@ -201,8 +201,9 @@ public void Event_ControlEnd(Event event, const char[] name, bool dontBroadcast)
     int attacker = GetClientOfUserId(event.GetInt("userid"));
     int victim = GetClientOfUserId(event.GetInt("victim"));
 
-    //if (!IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
-    
+    if (!IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
+    if (victim <= 0 || attacker <= 0 || !IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
+
     char sKey[32];
     FormatEx(sKey, sizeof(sKey), "%d-%d", GetClientUserId(attacker), GetClientUserId(victim));
     //彻底移除对应计时器
