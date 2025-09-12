@@ -85,7 +85,7 @@ public void OnPluginStart()
         }
     }
     
-    //AutoExecConfig(true, "Seiunsky_1v1");
+    AutoExecConfig(true, "Seiunsky_1v1");
 }
 
 //cvar回调
@@ -201,7 +201,6 @@ public void Event_ControlEnd(Event event, const char[] name, bool dontBroadcast)
     int attacker = GetClientOfUserId(event.GetInt("userid"));
     int victim = GetClientOfUserId(event.GetInt("victim"));
 
-    if (!IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
     if (victim <= 0 || attacker <= 0 || !IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
 
     char sKey[32];
