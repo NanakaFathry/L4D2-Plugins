@@ -6,23 +6,29 @@
 #include <sdkhooks>
 #include <left4dhooks>
 
-#define PLUGIN_VERSION "2.0.2"
+ConVar 
+    g_cvPluginEnabled,
+    g_cvDamageOnControl,
+    g_cvDelayTime,
+    g_cvGodDuration,
+    g_cvEnableTakeDamage;
 
-ConVar g_cvPluginEnabled;
-ConVar g_cvDamageOnControl;
-ConVar g_cvDelayTime;
-ConVar g_cvGodDuration;
-ConVar g_cvEnableTakeDamage;
+int
+    g_iDamageOnControl;
 
-int g_iDamageOnControl;
+float
+    g_fDelayTime,
+    g_fGodDuration;
 
-float g_fDelayTime;
-float g_fGodDuration;
+bool
+    g_bPluginEnabled,
+    g_bEnableTakeDamage,
+    g_bIgnoreAbility[MAXPLAYERS + 1],
+    g_bIsControlled[MAXPLAYERS + 1];
 
-bool g_bPluginEnabled;
-bool g_bEnableTakeDamage;
-bool g_bIgnoreAbility[MAXPLAYERS + 1];
-bool g_bIsControlled[MAXPLAYERS + 1];
+StringMap
+    g_hTimerMap,
+    g_hGodModePlayers;
 
 enum ZombieClass
 {
@@ -36,15 +42,12 @@ enum ZombieClass
     ZC_Tank
 }
 
-StringMap g_hTimerMap;
-StringMap g_hGodModePlayers;
-
 public Plugin myinfo = 
 {
     name = "星云猫猫1v1",
     author = "Seiunsky Maomao",
     description = "生还被控时,扣血解控.类似于1v1eq的效果,灵感也来源于此.",
-    version = PLUGIN_VERSION,
+    version = "2.0.2",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -86,7 +89,7 @@ public void OnPluginStart()
         }
     }
     
-    AutoExecConfig(true, "Seiunsky_1v1");
+    //AutoExecConfig(true, "Seiunsky_1v1");
 }
 
 //cvar回调
@@ -604,32 +607,4 @@ bool IsValidPunishTarget(int attacker, int victim)
            IsValidSurvivor(victim) && 
            IsPlayerAlive(attacker) && 
            IsPlayerAlive(victim);
-}
-
-//先这样再那样插件清理
-public void OnPluginEnd()
-{
-    UnhookEvent("tongue_grab", Event_ControlStart);
-    UnhookEvent("tongue_release", Event_ControlEnd);
-    UnhookEvent("lunge_pounce", Event_ControlStart);
-    UnhookEvent("pounce_end", Event_ControlEnd);
-    UnhookEvent("jockey_ride", Event_ControlStart);
-    UnhookEvent("jockey_ride_end", Event_ControlEnd);
-    UnhookEvent("charger_pummel_start", Event_ControlStart);
-    UnhookEvent("charger_pummel_end", Event_ControlEnd);
-    UnhookEvent("player_death", Event_PlayerDeath);
-
-    if (g_bPluginEnabled && g_bEnableTakeDamage)
-    {
-        for (int i = 1; i <= MaxClients; i++)
-        {
-            if (IsClientInGame(i))
-            {
-                SDKUnhook(i, SDKHook_OnTakeDamage, OnTakeDamage);
-            }
-        }
-    }
-
-    delete g_hTimerMap;
-    delete g_hGodModePlayers;
 }
