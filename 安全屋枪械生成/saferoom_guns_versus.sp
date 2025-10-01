@@ -13,8 +13,8 @@ ConVar g_cvCounts;
 
 bool g_bEnabled;
 bool g_bWeaponsSpawned;
-bool g_bPlayerConnected = false;
-bool g_bRoundEndExecuted = false;
+bool g_bPlayerConnected;
+bool g_bRoundEndExecuted;
 
 ArrayList g_aWeapons;
 ArrayList g_aCounts;
@@ -53,19 +53,6 @@ public void OnPluginStart()
     
     //l4d2util_weapons.inc里的预缓存
     L4D2Weapons_Init();
-}
-
-public void OnPluginEnd()
-{
-    UnhookEvent("round_start", Event_RoundStart, EventHookMode_PostNoCopy);
-    UnhookEvent("player_connect_full", Event_PlayerConnectFull, EventHookMode_Post);
-    UnhookEvent("round_end", Event_RoundEnd, EventHookMode_PostNoCopy);
-    //UnhookEvent("map_transition", Event_MapTransition, EventHookMode_PostNoCopy);
-    //UnhookEvent("mission_lost", Event_Mission_Lost, EventHookMode_PostNoCopy);
-
-    delete g_aWeapons;
-    delete g_aCounts;
-    delete g_WeaponNameToId;
 }
 
 /*
