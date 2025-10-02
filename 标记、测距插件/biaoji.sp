@@ -6,40 +6,50 @@
 #include <sdkhooks>
 #include <clientprefs>
 
-#define PLUGIN_VERSION "1.2b"
+Handle
+    g_hCookie,
+    g_hDamageTimer[MAXPLAYERS + 1];
 
-Handle g_hCookie;
-Handle g_hDamageTimer[MAXPLAYERS + 1];
+float
+    g_fPoint1[MAXPLAYERS + 1][3],
+    g_fPoint2[MAXPLAYERS + 1][3],
+    g_fDamageCache[MAXPLAYERS + 1][MAXPLAYERS + 1];
 
-float g_fPoint1[MAXPLAYERS + 1][3];
-float g_fPoint2[MAXPLAYERS + 1][3];
-float g_fDamageCache[MAXPLAYERS + 1][MAXPLAYERS + 1];
+bool
+    g_bPluginEnabled,
+    g_bPluginDmg,
+    g_bPluginSIHighLight,
+    g_bPoint1Set[MAXPLAYERS + 1],
+    g_bPoint2Set[MAXPLAYERS + 1],
+    g_bDamageActive[MAXPLAYERS + 1];
 
-bool g_bPluginEnabled;
-bool g_bPoint1Set[MAXPLAYERS + 1];
-bool g_bPoint2Set[MAXPLAYERS + 1];
-bool g_bDamageActive[MAXPLAYERS + 1];
+int
+    g_iWitchModel1[MAXPLAYERS + 1],
+    g_iWitchModel2[MAXPLAYERS + 1];
 
-int g_iWitchModel1[MAXPLAYERS + 1];
-int g_iWitchModel2[MAXPLAYERS + 1];
+ConVar
+    g_cvPluginEnabled,
+    g_cvPluginDmg,
+    g_cvPluginSIHighLight;
 
-ConVar g_cvPluginEnabled;
-
-ArrayList g_aSpawnedSI[MAXPLAYERS + 1];
+ArrayList
+    g_aSpawnedSI[MAXPLAYERS + 1];
 
 public Plugin myinfo = 
 {
     name = "星云猫猫标记测距",
     author = "Seiunsky Maomao",
     description = "自用的测距插件, 功能是标记脚下两点坐标, 并计算距离, 以及特感的冻结、生成功能.",
-    version = PLUGIN_VERSION,
+    version = "1.3",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
 public void OnPluginStart()
 {
     //插件开关
-    g_cvPluginEnabled = CreateConVar("bjkg", "0", "插件开关 [1 → 开启 | 0 → 关闭]", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvPluginEnabled = CreateConVar("bjkg", "1", "插件开关 [1 → 开启 | 0 → 关闭]", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvPluginDmg = CreateConVar("bj_dmg", "0", "显示造成的伤害 [1 → 显示 | 0 → 不显示]", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvPluginSIHighLight = CreateConVar("bj_sihl", "0", "显示特感高亮光圈 [1 → 显示 | 0 → 不显示]", FCVAR_NONE, true, 0.0, true, 1.0);
 
     //管理员命令
     RegAdminCmd("sm_biaoji1", Command_MarkPoint1, ADMFLAG_GENERIC, "标记、取消坐标点1");
@@ -49,12 +59,16 @@ public void OnPluginStart()
 
     //注册插件开关的ConVar
     g_bPluginEnabled = GetConVarBool(g_cvPluginEnabled);
+    g_bPluginDmg = GetConVarBool(g_cvPluginDmg);
+    g_bPluginSIHighLight = GetConVarBool(g_cvPluginSIHighLight);
 
     //注册客户端cookie,用于存储标记点
     g_hCookie = RegClientCookie("biaoji_points", "存储标记点", CookieAccess_Private);
 
     //监听ConVar变化
     HookConVarChange(g_cvPluginEnabled, OnConVarChanged);
+    HookConVarChange(g_cvPluginDmg, OnConVarChanged);
+    HookConVarChange(g_cvPluginSIHighLight, OnConVarChanged);
 
     //检查客户端cookie是否已缓存
     for (int i = 1; i <= MaxClients; i++)
@@ -78,6 +92,14 @@ public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] n
     if (convar == g_cvPluginEnabled)
     {
         g_bPluginEnabled = GetConVarBool(g_cvPluginEnabled);
+    }
+    if (convar == g_cvPluginDmg)
+    {
+        g_bPluginDmg = GetConVarBool(g_cvPluginDmg);
+    }
+    if (convar == g_cvPluginSIHighLight)
+    {
+        g_bPluginSIHighLight = GetConVarBool(g_cvPluginSIHighLight);
     }
 }
 
@@ -375,18 +397,28 @@ public void OnEntityCreated(int entity, const char[] classname)
 
     if (StrEqual(classname, "smoker") || StrEqual(classname, "hunter") || StrEqual(classname, "boomer") || StrEqual(classname, "spitter") || StrEqual(classname, "jockey") || StrEqual(classname, "charger") || StrEqual(classname, "tank") || StrEqual(classname, "tank_rock") || StrEqual(classname, "witch"))
     {
-        SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage_SI); // 钩住特感伤害事件
+        if (g_bPluginDmg)
+        {
+            SDKHook(entity, SDKHook_OnTakeDamage, OnTakeDamage_SI);
+        }
         
-        // 设置发光轮廓
-        SetEntProp(entity, Prop_Send, "m_nGlowRange", 9999); // 发光范围
-        SetEntProp(entity, Prop_Send, "m_iGlowType", 3); // 发光类型
-        SetEntProp(entity, Prop_Send, "m_glowColorOverride", 0xFFC0CB); // 奶奶的，为什么不能显示漂亮的粉色！！！
+        if (g_bPluginSIHighLight)
+        {
+            SetEntProp(entity, Prop_Send, "m_nGlowRange", 9999);
+            SetEntProp(entity, Prop_Send, "m_iGlowType", 3);
+            SetEntProp(entity, Prop_Send, "m_glowColorOverride", 0xFFC0CB);
+        }
     }
 }
 
 //显示和计算攻击的伤害值
 public Action OnTakeDamage_SI(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
+    if (!g_bPluginDmg || !g_bPluginEnabled)
+    {
+        return Plugin_Continue;
+    }
+
     if (attacker > 0 && attacker <= MaxClients && IsClientInGame(attacker))
     {
         // 实时显示每一枪/每一颗弹丸的伤害
@@ -446,6 +478,7 @@ public Action Command_SpawnSI(int client, int args)
     if (!g_bPluginEnabled)
     {
         ReplyToCommand(client, "插件功能已关闭.");
+        ReplyToCommand(client, "请使用 !sm_cvar bjkg 1 打开插件开关.");
         return Plugin_Handled;
     }
 
@@ -457,7 +490,7 @@ public Action Command_SpawnSI(int client, int args)
 void ShowSpawnSIMenu(int client)
 {
     Menu menu = new Menu(SpawnSIMenuHandler);
-    menu.SetTitle("功能菜单：");
+    menu.SetTitle("功能菜单:");
 
     MoveType movetype = GetEntityMoveType(client);
     if (movetype != MOVETYPE_NOCLIP)
@@ -469,52 +502,41 @@ void ShowSpawnSIMenu(int client)
         menu.AddItem("noclip", "关闭穿墙");
     }
 
-    menu.AddItem("freeze", "特感冻结");
-    menu.AddItem("smoker", "舌头");
-    menu.AddItem("boomer", "胖子");
-    menu.AddItem("hunter", "猎人");
-    menu.AddItem("spitter", "口水");
-    menu.AddItem("jockey", "猴子");
-    menu.AddItem("charger", "牛牛");
-    menu.AddItem("tank", "坦克");
+    //伤害显示开关
+    char dmgDisplay[32];
+    Format(dmgDisplay, sizeof(dmgDisplay), "伤害显示:%s", g_bPluginDmg ? "开启" : "关闭");
+    menu.AddItem("dmg_toggle", dmgDisplay);
+
+    //特感高亮开关
+    char siHighlight[32];
+    Format(siHighlight, sizeof(siHighlight), "特感高亮:%s", g_bPluginSIHighLight ? "开启" : "关闭");
+    menu.AddItem("sihl_toggle", siHighlight);
+
+    //重做冻结开关
+    char freezeDisplay[32];
+    ConVar freezeCvar = FindConVar("nb_blind");
+    int freezeState = (freezeCvar != null) ? GetConVarInt(freezeCvar) : 0;
+    Format(freezeDisplay, sizeof(freezeDisplay), "特感冻结:%s", freezeState == 0 ? "关闭" : "开启");
+    menu.AddItem("freeze", freezeDisplay);
+
+    menu.AddItem("smoker", "生成舌头");
+    menu.AddItem("boomer", "生成胖子");
+    menu.AddItem("hunter", "生成猎人");
+    menu.AddItem("spitter", "生成口水");
+    menu.AddItem("jockey", "生成猴子");
+    menu.AddItem("charger", "生成牛牛");
+    menu.AddItem("tank", "生成坦克");
 
     menu.Display(client, MENU_TIME_FOREVER);
 }
 
-// 特殊感染者生成菜单处理
+//菜单功能回调处理
 public int SpawnSIMenuHandler(Menu menu, MenuAction action, int client, int param2)
 {
     if (action == MenuAction_Select)
     {
         char sInfo[32];
         menu.GetItem(param2, sInfo, sizeof(sInfo));
-
-        // 处理冻结开/关选项
-        if (StrEqual(sInfo, "freeze"))
-        {
-            // 获取当前的冻结状态
-            ConVar freezeCvar = FindConVar("nb_blind");     //是懒狗，于是直接使用nb_blind
-            if (freezeCvar != null)
-            {
-                int currentState = GetConVarInt(freezeCvar);
-                if (currentState == 1)
-                {
-                    // 如果当前是开启状态，则关闭
-                    ServerCommand("sm_cvar nb_blind 0");
-                    PrintToChat(client, "冻结已关闭.");
-                }
-                else
-                {
-                    // 如果当前是关闭状态，则开启
-                    ServerCommand("sm_cvar nb_blind 1");
-                    PrintToChat(client, "冻结已开启.");
-                }
-            }
-
-            // 重新显示菜单
-            ShowSpawnSIMenu(client);
-            return 0;
-        }
 
         //处理穿墙
         if (StrEqual(sInfo, "noclip"))
@@ -523,12 +545,64 @@ public int SpawnSIMenuHandler(Menu menu, MenuAction action, int client, int para
             if (movetype != MOVETYPE_NOCLIP)
             {
                 SetEntityMoveType(client, MOVETYPE_NOCLIP);
-                PrintToChat(client, "开启穿墙.");
+                PrintToChat(client, "\x04穿墙已\x05开启\x04.");
             }
             else
             {
                 SetEntityMoveType(client, MOVETYPE_WALK);
-                PrintToChat(client, "关闭穿墙.");
+                PrintToChat(client, "\x04穿墙已\x05关闭\x04.");
+            }
+
+            // 重新显示菜单
+            ShowSpawnSIMenu(client);
+            return 0;
+        }
+
+        //处理伤害显示开关回调
+        if (StrEqual(sInfo, "dmg_toggle"))
+        {
+            // 切换伤害显示状态
+            bool newState = !g_bPluginDmg;
+            SetConVarBool(g_cvPluginDmg, newState);
+            PrintToChat(client, "\x04伤害显示已\x05%s\x04.", newState ? "开启" : "关闭");
+            
+            // 重新显示菜单
+            ShowSpawnSIMenu(client);
+            return 0;
+        }
+
+        //处理特感高亮开关回调
+        if (StrEqual(sInfo, "sihl_toggle"))
+        {
+            // 切换特感高亮状态
+            bool newState = !g_bPluginSIHighLight;
+            SetConVarBool(g_cvPluginSIHighLight, newState);
+            PrintToChat(client, "\x04特感高亮已\x05%s\x04.", newState ? "开启" : "关闭");
+            
+            // 重新显示菜单
+            ShowSpawnSIMenu(client);
+            return 0;
+        }
+
+        //不再用sm_cvar nb_blind来处理
+        //换更好的
+        if (StrEqual(sInfo, "freeze"))
+        {
+            // 获取当前的冻结状态
+            ConVar freezeCvar = FindConVar("nb_blind");
+            if (freezeCvar != null)
+            {
+                int currentState = GetConVarInt(freezeCvar);
+                if (currentState == 0)
+                {
+                    SetConVarInt(freezeCvar, 1);
+                    PrintToChat(client, "\x04特感冻结已\x05开启\x04.");
+                }
+                else
+                {
+                    SetConVarInt(freezeCvar, 0);
+                    PrintToChat(client, "\x04特感冻结已\x05关闭\x04.");
+                }
             }
 
             // 重新显示菜单
