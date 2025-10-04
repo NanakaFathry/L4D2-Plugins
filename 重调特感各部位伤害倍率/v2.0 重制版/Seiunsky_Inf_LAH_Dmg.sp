@@ -536,6 +536,10 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
     if (!IsSurvivor(attacker) || !IsInfected(victim))
         return Plugin_Continue;
 
+    //非子弹伤害不处理
+    if (!(damagetype & DMG_BULLET))
+        return Plugin_Continue;
+
     //获取攻击者当前使用的枪械实体
     int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
     if (weapon == -1)   //特殊情况也直接返回
@@ -790,11 +794,9 @@ public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &dam
     if (!g_cvPluginEnabled.BoolValue || !IsSurvivor(attacker) || !IsInfected(victim))
         return Plugin_Continue;
 
-    /*
-    //非子弹伤害跳过
-    if (!DMG_BULLET)
+    //非子弹伤害不处理
+    if (!(damagetype & DMG_BULLET))
         return Plugin_Continue;
-    */
 
     //获取枪械信息，确保只对配置的枪械进行限制
     int weapon = GetEntPropEnt(attacker, Prop_Send, "m_hActiveWeapon");
