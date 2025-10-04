@@ -12,3 +12,7 @@ https://github.com/SirPlease/L4D2-Competitive-Rework
 然后再加载Cvar_DPL.smx。
 
 如果您的插件没有区分先后加载顺序，则一并放入Plugins里加载应该也是没问题的。
+
+cvar_tracking.cfg文件一般置于cfg文件夹内,
+然后在合适的地方,如:server.cfg等当中写入:
+exec cvar_tracking.cfg
