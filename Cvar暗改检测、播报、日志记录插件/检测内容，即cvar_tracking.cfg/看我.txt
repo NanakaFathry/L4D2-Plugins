@@ -6,3 +6,4 @@ exec cvar_tracking.cfg
 ....../cfg/cfgogl/***/shared_settings.cfg内,
 是否有正常写入:
 exec cvar_tracking.cfg
+(只要是最新的zonemod,应该都有的.)
