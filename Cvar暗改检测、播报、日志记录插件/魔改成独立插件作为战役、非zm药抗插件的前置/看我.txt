@@ -1,3 +1,0 @@
-魔改自zonemod的ClientSetting.sp,
-如果是战役或者非zonemod插件的则先加载这个,
-其作用是提供主要检测功能并移交Cvar_DPL插件处理.

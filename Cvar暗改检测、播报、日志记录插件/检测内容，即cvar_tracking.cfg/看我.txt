@@ -1,9 +1,0 @@
-一般置于cfg文件夹内,
-然后在合适的地方,如:server.cfg等当中写入:
-exec cvar_tracking.cfg
-
-如果是zonemod药抗插件,则检测相应的:
-....../cfg/cfgogl/***/shared_settings.cfg内,
-是否有正常写入:
-exec cvar_tracking.cfg
-(只要是最新的zonemod,应该都有的.)
