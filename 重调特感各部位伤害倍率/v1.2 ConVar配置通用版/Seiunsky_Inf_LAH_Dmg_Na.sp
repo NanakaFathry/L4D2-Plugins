@@ -57,7 +57,7 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
     g_cvPluginEnabled = CreateConVar("sm_inf_lah_dmg_enabled", "1", "插件开关,1开0关.", FCVAR_NONE, true, 0.0, true, 1.0);
-    g_cvAllowedWeapons = CreateConVar("sm_inf_lah_dmg_wp", "weapon_sniper_scout,weapon_sniper_awp", "允许的武器列表,用逗号分隔(不仅仅能填入狙)", FCVAR_NONE);
+    g_cvAllowedWeapons = CreateConVar("sm_inf_lah_dmg_wp", "weapon_sniper_scout,weapon_sniper_awp", "允许的武器列表,用逗号分隔(只能填入子弹类武器,非子弹类型插件不处理.)", FCVAR_NONE);
 
     g_cvDebugEnabled = CreateConVar("sm_inf_lah_dmg_debug", "0", "调试开关,1开0关.", FCVAR_NONE, true, 0.0, true, 1.0);
 
@@ -124,6 +124,10 @@ public Action OnTraceAttack(int victim, int &attacker, int &inflictor, float &da
 
     //确保攻击者是有效的生还,受害者是有效的特感
     if (!IsSurvivor(attacker) || !IsInfected(victim))
+        return Plugin_Continue;
+    
+    //非子弹伤害不处理
+    if (!(damagetype & DMG_BULLET))
         return Plugin_Continue;
 
     //获取攻击者当前使用的武器实体
@@ -327,6 +331,10 @@ float GetDamageMultiplier(const char[] classname, int hitgroup)
 public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
     if (!g_cvPluginEnabled.BoolValue || !IsSurvivor(attacker) || !IsInfected(victim))
+        return Plugin_Continue;
+
+    //非子弹伤害不处理
+    if (!(damagetype & DMG_BULLET))
         return Plugin_Continue;
 
     if (g_cvDebugEnabled.BoolValue)
