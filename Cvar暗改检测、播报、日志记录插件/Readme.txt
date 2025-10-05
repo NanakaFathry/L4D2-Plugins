@@ -5,10 +5,10 @@ https://github.com/SirPlease/L4D2-Competitive-Rework
 使得Cvar_DPL插件能够正常运作.
 
 因此,在加载Cvar_DPL插件前,
-如果是zm药抗插件的,则重新编译上面的:confoglcompmod.smx并替换,
+如果是zm药抗插件的,则重新编译/使用上面的:confoglcompmod.smx并替换,
 然后再加载Cvar_DPL.smx。
 
-如果是战役、非zm药抗插件等，则编译并加载TrackClientCvar_ZM.smx,
+如果是战役、非zm药抗插件等，则重新编译/加载TrackClientCvar_ZM.smx,
 然后再加载Cvar_DPL.smx。
 
 如果您的插件没有区分先后加载顺序，则一并放入Plugins里加载应该也是没问题的。
