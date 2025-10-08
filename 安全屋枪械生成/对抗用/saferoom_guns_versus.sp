@@ -14,8 +14,8 @@ ConVar g_cvDebug;
 
 bool g_bEnabled;
 bool g_bWeaponsSpawned;
-bool g_bPlayerConnected = false;
-bool g_bRoundEndExecuted = false;
+bool g_bPlayerConnected;
+bool g_bRoundEndExecuted;
 
 ArrayList g_aWeapons;
 ArrayList g_aCounts;
@@ -56,6 +56,8 @@ public void OnPluginStart()
     
     //l4d2util_weapons.inc里的预缓存
     L4D2Weapons_Init();
+
+    AutoExecConfig(true, "saferoom_guns_versus");
 }
 
 /*
