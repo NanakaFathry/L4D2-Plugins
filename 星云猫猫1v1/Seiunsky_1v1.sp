@@ -2,9 +2,15 @@
 #pragma newdecls required
 
 #include <sourcemod>
+#include <l4d2util>
 #include <sdktools>
 #include <sdkhooks>
 #include <left4dhooks>
+
+#define L4D2Team_None 0
+#define L4D2Team_Spectator 1
+#define L4D2Team_Survivor 2
+#define L4D2Team_Infected 3
 
 ConVar 
     g_cvPluginEnabled,
@@ -47,7 +53,7 @@ public Plugin myinfo =
     name = "星云猫猫1v1",
     author = "Seiunsky Maomao",
     description = "生还被控时,扣血解控.类似于1v1eq的效果,灵感也来源于此.",
-    version = "2.0.2",
+    version = "2.0.3",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -57,8 +63,8 @@ public void OnPluginStart()
     g_cvPluginEnabled = CreateConVar("sm_sicontrol_enabled", "1", "插件开关,1开0关.", FCVAR_NONE, true, 0.0, true, 1.0);
     g_cvDamageOnControl = CreateConVar("sm_sicontrol_damage", "25", "解控扣生还多少血?", FCVAR_NONE, true, 0.0, true, 999.0);
     g_cvDelayTime = CreateConVar("sm_sicontrol_delay", "1.0", "几秒后解控?", FCVAR_NONE, true, 0.1, true, 999.0);
-    g_cvGodDuration = CreateConVar("sm_sicontrol_god_duration", "10", "生还解控后有几秒无敌?", FCVAR_NONE, true, 0.1, true, 999.0);
-    g_cvEnableTakeDamage = CreateConVar("sm_sims_enable", "1", "是否移除特感对生还伤害?1是0否.", FCVAR_NONE, true, 0.0, true, 1.0);
+    g_cvGodDuration = CreateConVar("sm_sicontrol_god_duration", "4.0", "生还解控后有几秒无敌?", FCVAR_NONE, true, 0.1, true, 999.0);
+    g_cvEnableTakeDamage = CreateConVar("sm_sims_enable", "1", "是否移除特感对生还的伤害?1是0否.", FCVAR_NONE, true, 0.0, true, 1.0);
 
     g_hTimerMap = new StringMap();
     g_hGodModePlayers = new StringMap();
@@ -72,24 +78,17 @@ public void OnPluginStart()
     HookEvent("charger_pummel_start", Event_ControlStart);
     HookEvent("charger_pummel_end", Event_ControlEnd);
     HookEvent("player_death", Event_PlayerDeath);
-    
-    HookConVarChange(g_cvPluginEnabled, OnConVarChanged);
-    HookConVarChange(g_cvDamageOnControl, OnConVarChanged);
-    HookConVarChange(g_cvDelayTime, OnConVarChanged);
-    HookConVarChange(g_cvGodDuration, OnConVarChanged);
-    HookConVarChange(g_cvEnableTakeDamage, OnConVarChanged);
+    HookEvent("player_team", Event_PlayerTeam);
+
+    g_cvPluginEnabled.AddChangeHook(OnConVarChanged);
+    g_cvDamageOnControl.AddChangeHook(OnConVarChanged);
+    g_cvDelayTime.AddChangeHook(OnConVarChanged);
+    g_cvGodDuration.AddChangeHook(OnConVarChanged);
+    g_cvEnableTakeDamage.AddChangeHook(OnConVarChanged);
 
     UpdateConVars();
-
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (IsClientInGame(i))
-        {
-            OnClientPutInServer(i);
-        }
-    }
     
-    //AutoExecConfig(true, "Seiunsky_1v1");
+    AutoExecConfig(true, "Seiunsky_1v1");
 }
 
 //cvar回调
@@ -108,31 +107,37 @@ public void OnConVarChanged(ConVar convar, const char[] oldVal, const char[] new
     UpdateConVars();
 }
 
-//进服时挂钩
-public void OnClientPutInServer(int i)
+//这样挂钩靠谱些
+public void Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
-    if (g_bPluginEnabled && g_bEnableTakeDamage)        //全部满足true就会挂钩
+    int i = GetClientOfUserId(event.GetInt("userid"));
+    int oldTeam = event.GetInt("oldteam");
+    int newTeam = event.GetInt("team");
+    //生还特感挂钩
+    if (newTeam >= 2)
     {
         SDKHook(i, SDKHook_OnTakeDamage, OnTakeDamage);
+        //PrintToChatAll("[Debug] [%N]成功挂钩OnTakeDamage!", i);
+    }
+    //切旁观脱钩
+    if (newTeam == 1 && oldTeam >= 2)
+    {
+        SDKUnhook(i, SDKHook_OnTakeDamage, OnTakeDamage);
+        //PrintToChatAll("[Debug] [%N]成功脱钩OnTakeDamage!", i);
     }
 }
 
-//特感对生还伤害，生还受到伤害时触发的
+//特感对生还伤害
 public Action OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype)
 {
-    if (!g_bPluginEnabled || !g_bEnableTakeDamage)      //只满足其一个false就会执行返回
-        return Plugin_Continue;
-    
-    int real_attacker = GetEntPropEnt(inflictor, Prop_Send, "m_hOwnerEntity");
-    if (real_attacker == -1) 
-        real_attacker = attacker;
-    
-    if (IsValidSurvivor(victim) && IsSpecialInfected(real_attacker))    //注：这些特感里不包括口水和胖子
+    if (!g_bPluginEnabled || !g_bEnableTakeDamage) return Plugin_Continue;
+
+    if (IsValidSurvivor2(victim) && IsSpecialInfected(attacker))
     {
-        damage = 0.0;   //设置伤害为0
+        //PrintToChatAll("[Debug] [%N]攻击[%N]伤害类型[%d].", attacker, victim, damagetype);
+        damage = 0.0;
         return Plugin_Changed;
     }
-    
     return Plugin_Continue;
 }
 
@@ -180,7 +185,7 @@ public void Event_ControlStart(Event event, const char[] name, bool dontBroadcas
     
     int victim = GetClientOfUserId(event.GetInt("victim"));
     int attacker = GetClientOfUserId(event.GetInt("userid"));
-    if (!IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
+    if (!IsValidSurvivor2(victim) || !IsSpecialInfected(attacker)) return;
 
     //如果生还已被控,则返回
     //if (g_bIsControlled[victim]) return;
@@ -219,8 +224,8 @@ public void Event_ControlEnd(Event event, const char[] name, bool dontBroadcast)
     int attacker = GetClientOfUserId(event.GetInt("userid"));
     int victim = GetClientOfUserId(event.GetInt("victim"));
 
-    if (!IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
-    if (victim <= 0 || attacker <= 0 || !IsValidSurvivor(victim) || !IsSpecialInfected(attacker)) return;
+    if (!IsValidSurvivor2(victim) || !IsSpecialInfected(attacker)) return;
+    if (victim <= 0 || attacker <= 0 || !IsValidSurvivor2(victim) || !IsSpecialInfected(attacker)) return;
 
     char sKey[32];
     FormatEx(sKey, sizeof(sKey), "%d-%d", GetClientUserId(attacker), GetClientUserId(victim));
@@ -310,7 +315,7 @@ void ApplyPunishment(int attacker, int victim)
     float current_temp = L4D_GetTempHealth(victim);
 
     //确保无敌状态不会重复应用
-    if(IsValidSurvivor(victim))
+    if(IsValidSurvivor2(victim))
     {
         char sUserID[12];
         IntToString(GetClientUserId(victim), sUserID, sizeof(sUserID));
@@ -367,15 +372,7 @@ void ApplyGodMode(int b)
     dp.WriteCell(GetClientUserId(b));
     CreateTimer(g_fGodDuration, Timer_RemoveGodMode, dp);
 
-    //打印出来告知
-    for (int i = 1; i <= MaxClients; i++)
-    {
-        if (IsClientInGame(i) && !IsFakeClient(i) && 
-            (i == b || GetClientTeam(i) == 3 || GetClientTeam(i) == 1))
-        {
-            PrintToChat(i, "\x04[解控保护]\x01 生还无敌效果将持续: %.1f秒", g_fGodDuration);
-        }
-    }
+    PrintToChatAll("\x04[解控保护]\x01 生还无敌效果将持续: %.1f秒", g_fGodDuration);
 }
 
 //移除无敌
@@ -385,7 +382,7 @@ public Action Timer_RemoveGodMode(Handle timer, DataPack dp)
     int b = GetClientOfUserId(dp.ReadCell());
     delete dp;
 
-    if(IsValidSurvivor(b))
+    if(IsValidSurvivor2(b))
     {
         char sUserID[12];
         IntToString(GetClientUserId(b), sUserID, sizeof(sUserID));
@@ -417,7 +414,7 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 {
     int a = GetClientOfUserId(event.GetInt("userid"));
 
-    if (!IsValidSurvivor(a)) return;   //非生还勿扰
+    if (!IsValidSurvivor2(a)) return;   //非生还勿扰
     
     //无敌状态清理
     char sUserID[12];
@@ -469,12 +466,6 @@ public void Event_PlayerDeath(Event event, const char[] name, bool dontBroadcast
 //玩家断开连接时清理
 public void OnClientDisconnect(int i)
 {
-    //取消挂钩
-    if (g_bPluginEnabled && g_bEnableTakeDamage)
-    {
-        SDKUnhook(i, SDKHook_OnTakeDamage, OnTakeDamage);
-    }
-
     //无敌状态清理
     char sUserID[12];
     IntToString(GetClientUserId(i), sUserID, sizeof(sUserID));
@@ -529,7 +520,7 @@ public void OnMapEnd()
     //重置状态
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsClientInGame(i) && GetClientTeam(i) == 2) //只需要处理生还
+        if (IsValidSurvivor2(i)) //只需要处理生还
         {
             //无敌状态重置
             if (g_bIgnoreAbility[i])
@@ -552,7 +543,7 @@ public void OnMapStart()
 {
     for (int i = 1; i <= MaxClients; i++)
     {
-        if (IsClientInGame(i) && GetClientTeam(i) == 2) //只需要处理生还
+        if (IsValidSurvivor2(i)) //只需要处理生还
         {
             //无敌状态重置
             if (g_bIgnoreAbility[i])
@@ -570,41 +561,26 @@ public void OnMapStart()
     }
 }
 
+//有效客户端,特感生还均可
+bool IsValidClient(int i)
+{
+    return (IsValidClientIndex(i) && IsClientInGame(i) && !IsClientSourceTV(i) && !IsClientReplay(i));
+}
+
 //生还判断,无论生死
-bool IsValidSurvivor(int i)
+bool IsValidSurvivor2(int i)
 {
-    return i > 0 && 
-           i <= MaxClients && 
-           IsClientInGame(i) && 
-           GetClientTeam(i) == 2;
+    return IsValidClient(i) && IsSurvivor(i);
 }
-/*
-//活着的生还判断
-bool IsValidSurvivor(int i)
-{
-    return i > 0 && 
-           i <= MaxClients && 
-           IsClientInGame(i) && 
-           GetClientTeam(i) == 2 && 
-           IsPlayerAlive(i);
-}
-*/
 
 //4只控制型特感判断
 bool IsSpecialInfected(int i)
 {
-    ZombieClass zClass = view_as<ZombieClass>(GetEntProp(i, Prop_Send, "m_zombieClass"));
-    return (zClass == ZC_Smoker || 
-            zClass == ZC_Hunter || 
-            zClass == ZC_Jockey || 
-            zClass == ZC_Charger);
+    return (IsValidClient(i) && IsInfected(i) && (GetInfectedClass(i) == 1 || GetInfectedClass(i) == 3 || GetInfectedClass(i) == 5 || GetInfectedClass(i) == 6));
 }
 
 //有效的双方,攻击-特感,受害-生还.
 bool IsValidPunishTarget(int attacker, int victim)
 {
-    return IsSpecialInfected(attacker) && 
-           IsValidSurvivor(victim) && 
-           IsPlayerAlive(attacker) && 
-           IsPlayerAlive(victim);
+    return IsSpecialInfected(attacker) && IsValidSurvivor2(victim) && IsPlayerAlive(attacker) && IsPlayerAlive(victim);
 }
