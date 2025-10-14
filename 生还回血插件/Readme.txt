@@ -36,3 +36,7 @@ sm_cvar sm_heal_auto_enabled 0      //是否自动接管回血开关,1是0否
 sm_cvar sm_heal_auto_player 2       //少于几人自动接管更改回血开关
 sm_cvar sm_heal_melee 1             //近战能否回血
 sm_cvar sm_heal_debug 0             //调试开关
+
+管理命令：
+!skheal
+管理员用于来手动开关插件。
