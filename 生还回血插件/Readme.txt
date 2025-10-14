@@ -22,7 +22,6 @@
 有需要的话根据插件最后的(bool IsValidSpecialInfected)进行修改等就完事了.
 
 详细的见配置:
-
 // [huixue.smx]
 sm_cvar sm_heal_enabled 1           //插件开关,1开0关
 sm_cvar sm_heal_h_required 1000     //攻击特感积累多少伤害回一次实血
