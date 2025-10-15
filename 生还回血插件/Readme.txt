@@ -28,7 +28,7 @@ sm_cvar sm_heal_h_required 1000     //攻击特感积累多少伤害回一次实
 sm_cvar sm_heal_h_amount 2          //每次回多少实血,设置0则关闭回实血功能
 sm_cvar sm_heal_h_max 100           //停止回实血的上限阈值
 sm_cvar sm_heal_allow_temp 1        //实血治疗上限阈值里是否应该包含虚血
-sm_cvar sm_heal_t_required 600      //攻击特感积累多少血回一次虚血
+sm_cvar sm_heal_t_required 600      //攻击特感积累多少伤害回一次虚血
 sm_cvar sm_heal_t_amount 5          //每次回多少虚血,设置0则关闭回虚血功能
 sm_cvar sm_heal_t_max 50            //停止回虚血的上限阈值
 sm_cvar sm_heal_auto_enabled 0      //是否自动接管回血开关,1是0否
