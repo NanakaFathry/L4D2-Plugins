@@ -37,7 +37,7 @@ public void OnPluginStart()
     g_ReplaceList = new ArrayList(ByteCountToCells(256));
     
     g_cvPluginEnabled = CreateConVar("sm_bszh_enabled", "1", "插件开关.(1开,0关.)", _, true, 0.0, true, 1.0);
-    g_cvAdminImmunity = CreateConVar("sm_bszh_admin_immunity", "1", "管理员说的道理?(1是,0否.)", _, true, 0.0, true, 1.0);
+    g_cvAdminImmunity = CreateConVar("sm_bszh_admin_immunity", "0", "管理员说的道理?(1是,0否.)", _, true, 0.0, true, 1.0);
     g_cvDebug = CreateConVar("sm_bszh_debug", "0", "调试开关.(1开,0关.)", _, true, 0.0, true, 1.0);
     
     RegAdminCmd("sm_bszh_reload", Command_BSZHReload, ADMFLAG_ROOT, "管理员重载配置规则.");
@@ -49,7 +49,7 @@ public void OnPluginStart()
 
     LoadReplaceConfig();
 
-    //AutoExecConfig(true, "BieShuoZangHua");
+    AutoExecConfig(true, "BieShuoZangHua");
 }
 
 //首次玩家进服
