@@ -21,14 +21,15 @@ ConVar
     g_cvDebug;
 
 bool
-    g_bPlayerPutInServer;
+    g_bPlayerPutInServer,
+    g_bIsChanged[MAXPLAYERS + 1];
 
 public Plugin myinfo = 
 {
     name = "文明聊天,人人有责",
     author = "Seiunsky Maomao",
     description = "检测,拦截并直接替换玩家相应聊天内容,主要用来反脏话和敏感言论.",
-    version = "1.1.1",
+    version = "1.2",
     url = "https://github.com/NanakaFathry/L4D2-Plugins"
 };
 
@@ -37,7 +38,7 @@ public void OnPluginStart()
     g_ReplaceList = new ArrayList(ByteCountToCells(256));
     
     g_cvPluginEnabled = CreateConVar("sm_bszh_enabled", "1", "插件开关.(1开,0关.)", _, true, 0.0, true, 1.0);
-    g_cvAdminImmunity = CreateConVar("sm_bszh_admin_immunity", "1", "管理员说的道理?(1是,0否.)", _, true, 0.0, true, 1.0);
+    g_cvAdminImmunity = CreateConVar("sm_bszh_admin_immunity", "0", "管理员说的道理?(1是,0否.)", _, true, 0.0, true, 1.0);
     g_cvDebug = CreateConVar("sm_bszh_debug", "0", "调试开关.(1开,0关.)", _, true, 0.0, true, 1.0);
     
     RegAdminCmd("sm_bszh_reload", Command_BSZHReload, ADMFLAG_ROOT, "管理员重载配置规则.");
@@ -169,35 +170,35 @@ public Action OnSayCommand(int client, const char[] command, int argc)
     
     if (g_cvAdminImmunity.BoolValue && IsClientAdmin(client))
         return Plugin_Continue;
+
+    if (g_bIsChanged[client])
+    {
+        g_bIsChanged[client] = false;
+
+        if (g_cvDebug.BoolValue)
+        {
+            PrintToServer("[!] 消息已替换.");
+        }
+        return Plugin_Continue;
+    }
     
-    // 截取
+    //截取原消息
     char message[256];
     GetCmdArgString(message, sizeof(message));
 
     StripQuotes(message);
-    TrimString(message);
+    //TrimString(message);
 
-    //检查是否为命令
-    if (strlen(message) > 0 && (message[0] == '!' || message[0] == '/'))
-    {
-        if (g_cvDebug.BoolValue)
-        {
-            PrintToServer("[!]检测到命令前缀,跳过. [%s]", message);
-        }
-        return Plugin_Continue;
-    }
-
-    //原消息
-    char originalMsg[256];
-    strcopy(originalMsg, sizeof(originalMsg), message);
-    //替换后消息
+    //替换消息
     char newMsg[256];
-    strcopy(newMsg, sizeof(newMsg), originalMsg);
-    //是否需要进行替换
-    bool replaced = ProcessMessageReplacement(newMsg, sizeof(newMsg), originalMsg);
+    strcopy(newMsg, sizeof(newMsg), message);
+    bool replaced = ProcessMessageReplacement(newMsg, sizeof(newMsg), message);
     //最终替换
-    if (replaced && !StrEqual(newMsg, originalMsg))
+    if (replaced && !StrEqual(newMsg, message))
     {
+        //标记已替换
+        g_bIsChanged[client] = true;
+
         //用这种方式来代发消息即可
         if (StrEqual(command, "say"))
         {
@@ -215,19 +216,35 @@ public Action OnSayCommand(int client, const char[] command, int argc)
 }
 
 //消息替换
-bool ProcessMessageReplacement(char[] buffer, int maxlen, const char[] original)
+bool ProcessMessageReplacement(char[] buffer, int maxlen, const char[] message)
 {
     bool replaced = false;
     char tempBuffer[256];
-    strcopy(tempBuffer, sizeof(tempBuffer), original);
+    strcopy(tempBuffer, sizeof(tempBuffer), message);
     
-    //移除特殊字符并转小写
+    //移除特殊字符并转小写,放行命令
     char processedMsg[256];
-    strcopy(processedMsg, sizeof(processedMsg), original);
+    strcopy(processedMsg, sizeof(processedMsg), message);
     if (g_cvDebug.BoolValue)
     {
         PrintToServer("[!] 原始消息:[%s]", processedMsg);
     }
+
+    //是否为命令
+    char commandCheck[256];
+    strcopy(commandCheck, sizeof(commandCheck), processedMsg);
+    TrimString(commandCheck);   //去除首尾空格
+    if (strlen(commandCheck) > 0 && (commandCheck[0] == '!' || commandCheck[0] == '/'))
+    {
+        if (g_cvDebug.BoolValue)
+        {
+            PrintToServer("[!] 是命令前缀,去除前空格并输出:[%s]", commandCheck);
+        }
+        strcopy(buffer, maxlen, commandCheck);
+        return true;
+    }
+
+    //非命令继续处理
     RemoveAllSpecialCharacters(processedMsg, sizeof(processedMsg));
     StringToLower(processedMsg, sizeof(processedMsg));
     if (g_cvDebug.BoolValue)
@@ -472,6 +489,18 @@ void CreateDefaultConfig(const char[] path)
     file.WriteLine("s,比_***_2");
     file.WriteLine("s,碧_***_2");
     file.WriteLine("s,币_***_2");
+    file.WriteLine("纱,布_***_2");
+    file.WriteLine("纱,b_***_2");
+    file.WriteLine("s,布_***_2");
+    file.WriteLine("妈,逼_***_2");
+    file.WriteLine("m,逼_***_2");
+    file.WriteLine("妈,b_***_2");
+    file.WriteLine("麻,痹_***_2");
+    file.WriteLine("麻,b_***_2");
+    file.WriteLine("m,痹_***_2");
+    file.WriteLine("索,嗨_***_2");
+    file.WriteLine("臭,逼_***_2");
+    file.WriteLine("臭,嗨_***_2");
     
     delete file;
 }
@@ -507,7 +536,6 @@ void StringToLower(char[] buffer, int maxlen)
 //移除特殊字符
 void RemoveAllSpecialCharacters(char[] buffer, int maxlen)
 {
-    //空格等特殊字符
     ReplaceString(buffer, maxlen, " ", "", false);
     ReplaceString(buffer, maxlen, ",", "", false);
     ReplaceString(buffer, maxlen, ".", "", false);
@@ -559,4 +587,31 @@ void RemoveAllSpecialCharacters(char[] buffer, int maxlen)
     ReplaceString(buffer, maxlen, "}", "", false);
     ReplaceString(buffer, maxlen, "!", "", false);
     ReplaceString(buffer, maxlen, "！", "", false);
+    ReplaceString(buffer, maxlen, "¿", "", false);
+    ReplaceString(buffer, maxlen, "✵", "", false);
+    ReplaceString(buffer, maxlen, "§", "", false);
+    ReplaceString(buffer, maxlen, "☆", "", false);
+    ReplaceString(buffer, maxlen, "★", "", false);
+    ReplaceString(buffer, maxlen, "↑", "", false);
+    ReplaceString(buffer, maxlen, "↓", "", false);
+    ReplaceString(buffer, maxlen, "←", "", false);
+    ReplaceString(buffer, maxlen, "→", "", false);
+    ReplaceString(buffer, maxlen, "⋆", "", false);
+    ReplaceString(buffer, maxlen, "≛", "", false);
+    ReplaceString(buffer, maxlen, "✦", "", false);
+    ReplaceString(buffer, maxlen, "✧", "", false);
+    ReplaceString(buffer, maxlen, "✩", "", false);
+    ReplaceString(buffer, maxlen, "✪", "", false);
+    ReplaceString(buffer, maxlen, "✫", "", false);
+    ReplaceString(buffer, maxlen, "✬", "", false);
+    ReplaceString(buffer, maxlen, "✭", "", false);
+    ReplaceString(buffer, maxlen, "✮", "", false);
+    ReplaceString(buffer, maxlen, "✯", "", false);
+    ReplaceString(buffer, maxlen, "✰", "", false);
+    ReplaceString(buffer, maxlen, "⍟", "", false);
+    ReplaceString(buffer, maxlen, "⭑", "", false);
+    ReplaceString(buffer, maxlen, "⭒", "", false);
+    ReplaceString(buffer, maxlen, "⚝", "", false);
+    ReplaceString(buffer, maxlen, "⛤", "", false);
+    ReplaceString(buffer, maxlen, "✡", "", false);
 }

@@ -20,6 +20,14 @@ fuck_杂鱼♡~_2
 sb_杂鱼♡~_1
 傻,逼_杂鱼♡_2
 
+注:
+为了使得!或/开头的聊天命令可以正常使用不被篡改,因此只能移除消息前的空格后其允许正常输出.
+因此非常建议使用sir please的bequiet插件屏蔽命令在聊天框的输出↓↓↓
+bequiet插件源码：
+https://github.com/SirPlease/L4D2-Competitive-Rework/blob/master/addons/sourcemod/scripting/bequiet.sp
+翻译文件：
+https://github.com/SirPlease/L4D2-Competitive-Rework/blob/master/addons/sourcemod/translations/bequiet.phrases.txt
+
 管理员命令：
 !bszh_reload    //重载规则配置
 
